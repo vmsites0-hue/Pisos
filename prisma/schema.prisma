@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ==========================================
+// MÓDULO: Autenticación y Autorización
+// ==========================================
+
+model Usuario {
+  id          Int       @id @default(autoincrement())
+  nombre      String
+  email       String    @unique
+  password    String    // Hashed
+  rol         String    @default("VENDEDOR")
+  sucursalId  Int?
+  activo      Boolean   @default(true)
+  creadoEn    DateTime  @default(now())
+  actualizado DateTime  @updatedAt
+
+  sucursal    Sucursal? @relation(fields: [sucursalId], references: [id])
+  ventas      Venta[]
+}
+
+// ==========================================
+// MÓDULO: Sucursales
+// ==========================================
+
+model Sucursal {
+  id          Int       @id @default(autoincrement())
+  nombre      String
+  direccion   String?
+  telefono    String?
+  activa      Boolean   @default(true)
+  creadoEn    DateTime  @default(now())
+
+  usuarios    Usuario[]
+  inventarios Inventario[]
+  ventas      Venta[]
+}
+
+// ==========================================
+// MÓDULO: Productos y Catálogo
+// ==========================================
+
+model Categoria {
+  id          Int        @id @default(autoincrement())
+  nombre      String     @unique
+  productos   Producto[]
+}
+
+model Producto {
+  id                Int                  @id @default(autoincrement())
+  codigo            String               @unique
+  codigoBarras      String?              @unique
+  nombre            String
+  descripcion       String?
+  marca             String?
+  categoriaId       Int
+  unidadVenta       String               @default("UNIDAD")
+  imagenUrl         String?
+  
+  // Configuración específica para pisos (Cálculo M2 -> Cajas)
+  m2PorCaja         Float?               // Ejemplo: 2.08 m2
+  permiteFraccion   Boolean              @default(false)
+  
+  precioCompra      Float
+  precioVenta       Float
+  stockMinimo       Float                @default(0)
+  
+  creadoEn          DateTime             @default(now())
+  actualizado       DateTime             @updatedAt
+
+  categoria         Categoria            @relation(fields: [categoriaId], references: [id])
+  inventarios       Inventario[]
+  detallesVenta     DetalleVenta[]
+  detallesPresupuesto DetallePresupuesto[]
+}
+
+// ==========================================
+// MÓDULO: Inventario (Multisucursal y Lotes)
+// ==========================================
+
+model Inventario {
+  id              Int       @id @default(autoincrement())
+  productoId      Int
+  sucursalId      Int
+  loteTono        String?   // Tono o calibre para cerámicas
+  stockActual     Float     @default(0)
+  stockReservado  Float     @default(0)
+  
+  actualizado     DateTime  @updatedAt
+
+  producto        Producto  @relation(fields: [productoId], references: [id])
+  sucursal        Sucursal  @relation(fields: [sucursalId], references: [id])
+
+  @@unique([productoId, sucursalId, loteTono])
+}
+
+// ==========================================
+// MÓDULO: Clientes
+// ==========================================
+
+model Cliente {
+  id             Int           @id @default(autoincrement())
+  nombre         String
+  apellido       String
+  documento      String        @unique // CI o DNI
+  ruc            String?       @unique
+  telefono       String?
+  correo         String?
+  direccion      String?
+  
+  // Línea de crédito
+  limiteCredito  Float         @default(0)
+  saldoDeudor    Float         @default(0)
+
+  creadoEn       DateTime      @default(now())
+
+  ventas         Venta[]
+  presupuestos   Presupuesto[]
+}
+
+// ==========================================
+// MÓDULO: Ventas
+// ==========================================
+
+model Venta {
+  id             Int           @id @default(autoincrement())
+  sucursalId     Int
+  usuarioId      Int
+  clienteId      Int
+  fecha          DateTime      @default(now())
+  
+  subtotal       Float
+  descuento      Float         @default(0)
+  total          Float
+  
+  estado         String        @default("PENDIENTE")
+  metodoPago     String?       // EFECTIVO, TARJETA, TRANSFERENCIA, CREDITO
+  tipoEntrega    String        @default("ENVIO") // ENVIO o RETIRO
+  chofer         String?       // Chofer asignado para envíos
+  observaciones  String?       // Notas de observación para el despacho
+
+  sucursal       Sucursal      @relation(fields: [sucursalId], references: [id])
+  usuario        Usuario       @relation(fields: [usuarioId], references: [id])
+  cliente        Cliente       @relation(fields: [clienteId], references: [id])
+  detalles       DetalleVenta[]
+}
+
+model DetalleVenta {
+  id             Int       @id @default(autoincrement())
+  ventaId        Int
+  productoId     Int
+  
+  cantidad       Float     // Puede ser m2 o cajas
+  precioUnitario Float
+  subtotal       Float
+  
+  venta          Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  producto       Producto  @relation(fields: [productoId], references: [id])
+}
+
+// ==========================================
+// MÓDULO: Presupuestos (Cotizaciones)
+// ==========================================
+
+model Presupuesto {
+  id             Int                  @id @default(autoincrement())
+  clienteId      Int
+  fecha          DateTime             @default(now())
+  subtotal       Float
+  descuento      Float                @default(0)
+  total          Float
+  validezDias    Int                  @default(15)
+  
+  cliente        Cliente              @relation(fields: [clienteId], references: [id])
+  detalles       DetallePresupuesto[]
+}
+
+model DetallePresupuesto {
+  id             Int         @id @default(autoincrement())
+  presupuestoId  Int
+  productoId     Int
+  
+  cantidad       Float
+  precioUnitario Float
+  subtotal       Float
+  
+  presupuesto    Presupuesto @relation(fields: [presupuestoId], references: [id], onDelete: Cascade)
+  producto       Producto    @relation(fields: [productoId], references: [id])
+}
+
+// ==========================================
+// MÓDULO: Gastos Diarios
+// ==========================================
+
+model Gasto {
+  id          Int      @id @default(autoincrement())
+  descripcion String
+  monto       Float
+  categoria   String?
+  fecha       DateTime @default(now())
+}
+
+// ==========================================
+// MÓDULO: Reglas de Descuento Automático
+// ==========================================
+
+model ReglaDescuento {
+  id                 Int      @id @default(autoincrement())
+  nombre             String
+  tipo               String   // POR_VOLUMEN, POR_CATEGORIA, POR_MONTO
+  categoriaId        Int?     // Si aplica solo a una categoría
+  umbralMinimo       Float    // Ej: 20 m² o 500000 Gs.
+  porcentajeDescuento Float   // Ej: 5 (= 5%)
+  activa             Boolean  @default(true)
+  creadoEn           DateTime @default(now())
+}

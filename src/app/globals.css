@@ -1,0 +1,308 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    background-color: #0c0a09 !important; /* Stone 950 (Fondo ultra elegante casi negro) */
+    color: #f5f5f4 !important; /* Stone 100 */
+  }
+  html {
+    @apply font-sans;
+    background-color: #0c0a09 !important;
+  }
+}
+
+/* ==========================================
+   ANULACIONES DE ESTILO (DARK MODE INYECTADO)
+   ========================================== */
+
+/* Fondos y contenedores */
+.bg-white {
+  background-color: #1c1917 !important; /* Stone 900 */
+}
+.bg-slate-50, .bg-slate-100\/50 {
+  background-color: #0c0a09 !important; /* Stone 950 */
+}
+.bg-slate-100, .bg-slate-200\/50 {
+  background-color: #292524 !important; /* Stone 800 */
+}
+.bg-slate-900 {
+  background-color: #44403c !important; /* Stone 700 para resaltar */
+}
+.hover\:bg-slate-50:hover {
+  background-color: #292524 !important;
+}
+.hover\:bg-slate-100:hover {
+  background-color: #292524 !important;
+}
+
+/* Bordes y Divisiones */
+.border, .border-r, .border-b, .border-t, .border-slate-200, .border-slate-100, .border-dashed {
+  border-color: #292524 !important; /* Stone 800 */
+}
+
+/* Textos y Tipografías */
+.text-slate-900, .text-slate-950, .text-slate-800, .text-slate-700, .text-slate-950 {
+  color: #f5f5f4 !important; /* Stone 100 */
+}
+.text-slate-600, .text-slate-500, .text-slate-400 {
+  color: #a8a29e !important; /* Stone 400 */
+}
+.text-slate-300 {
+  color: #d6d3d1 !important; /* Stone 300 */
+}
+
+/* Inputs, Selects y Formularios */
+input[type="text"], 
+input[type="number"], 
+input[type="email"], 
+input[type="password"], 
+select, 
+textarea {
+  background-color: #1c1917 !important; /* Stone 900 */
+  color: #f5f5f4 !important; /* Stone 100 */
+  border-color: #44403c !important; /* Stone 700 */
+}
+input::placeholder {
+  color: #78716c !important; /* Stone 500 */
+}
+
+/* Tablas */
+.bg-slate-50 {
+  background-color: #1c1917 !important; /* Stone 900 */
+}
+thead.bg-slate-50, tr.bg-slate-50 {
+  background-color: #292524 !important; /* Stone 800 */
+}
+tr:hover {
+  background-color: rgba(41, 37, 36, 0.3) !important;
+}
+
+/* Ajustes especiales del POS y modals */
+.bg-blue-50 {
+  background-color: rgba(30, 41, 59, 0.5) !important;
+  border-color: #1e3a8a !important;
+  color: #93c5fd !important;
+}
+.bg-blue-50 * {
+  color: #93c5fd !important;
+}
+.bg-emerald-50 {
+  background-color: rgba(6, 78, 59, 0.4) !important;
+  border-color: #065f46 !important;
+  color: #6ee7b7 !important;
+}
+.bg-emerald-50 * {
+  color: #6ee7b7 !important;
+}
+.bg-red-50 {
+  background-color: rgba(153, 27, 27, 0.4) !important;
+  border-color: #991b1b !important;
+  color: #fca5a5 !important;
+}
+.bg-red-50 * {
+  color: #fca5a5 !important;
+}
+.bg-amber-50 {
+  background-color: rgba(146, 64, 14, 0.4) !important;
+  border-color: #92400e !important;
+  color: #fde047 !important;
+}
+.bg-amber-50 * {
+  color: #fde047 !important;
+}
+
+/* Recibo e Impresión */
+@media print {
+  /* Ocultar barra lateral, cabeceras web, botones y otros elementos interactivos */
+  aside,
+  header,
+  nav,
+  .no-print,
+  button,
+  a {
+    display: none !important;
+  }
+  
+  /* Resetear márgenes y fondos de pantalla para usar la hoja blanca */
+  body, html {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Quitar márgenes impuestos por el layout lateral */
+  .flex-1.ml-64 {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  /* Centrar el ticket/presupuesto y expandirlo */
+  .fixed.inset-0 {
+    position: static !important;
+    background-color: #ffffff !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: flex-start !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  .print-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 10px !important;
+    margin: 0 auto !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11px !important;
+  }
+
+  /* Ocultar cabeceras y pies de página automáticos del navegador */
+  @page {
+    margin: 0.5cm;
+  }
+
+  /* Forzar que todos los textos del contenido sean legibles en negro */
+  .print-content * {
+    color: #000000 !important;
+    background-color: transparent !important;
+  }
+
+  .print-content .bg-slate-950 {
+    background-color: #f5f5f4 !important; /* Cambiar a fondo gris muy claro en impresión para ahorrar tinta */
+    color: #000000 !important;
+  }
+}
