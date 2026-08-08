@@ -1,31 +1,8 @@
-import { prisma } from "@/lib/prisma";
-import { LogisticaClient } from "@/components/logistica/LogisticaClient";
+import { LogisticaClient } from "@/modules/logistics/components/LogisticaClient";
+import { getLogisticsPageData } from "@/modules/logistics/repositories/logistics.repository";
 
 export default async function LogisticaPage() {
-  // 1. Obtener todas las ventas con sus detalles
-  const sales = await prisma.venta.findMany({
-    include: {
-      detalles: {
-        include: {
-          producto: true,
-        },
-      },
-      cliente: true,
-      sucursal: true,
-    },
-    orderBy: {
-      fecha: "desc",
-    },
-  });
+  const { sales, branches } = await getLogisticsPageData();
 
-  // 2. Obtener todas las sucursales para el filtro
-  const sucursales = await prisma.sucursal.findMany({
-    orderBy: {
-      nombre: "asc",
-    },
-  });
-
-  return (
-    <LogisticaClient sales={sales} sucursales={sucursales} />
-  );
+  return <LogisticaClient sales={sales} sucursales={branches} />;
 }

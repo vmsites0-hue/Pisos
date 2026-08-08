@@ -1,36 +1,150 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ERPiso
 
-## Getting Started
+ERPiso es un sistema de gestión para una empresa que vende pisos y productos relacionados. El MVP cubre catálogo, inventario, clientes, presupuestos, ventas, logística y finanzas básicas.
 
-First, run the development server:
+La versión actual utiliza Next.js, React, TypeScript, Prisma y SQLite. La facturación electrónica no forma parte del MVP; los comprobantes generados por la aplicación son documentos internos no fiscales.
+
+## Requisitos
+
+- Node.js compatible con Next.js 16.
+- pnpm 11.8.0 o compatible.
+- Git.
+
+El proyecto utiliza exclusivamente pnpm. No se deben generar ni versionar archivos `package-lock.json` o `yarn.lock`.
+
+## Instalación
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <url-del-repositorio>
+cd Pisos
+pnpm install --frozen-lockfile
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Copiar el archivo de configuración:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cp .env.example .env
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+En PowerShell:
 
-## Learn More
+```powershell
+Copy-Item .env.example .env
+```
 
-To learn more about Next.js, take a look at the following resources:
+Antes de ejecutar el seed, cambiar `SEED_ADMIN_PASSWORD` en `.env`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Base de datos nueva
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Crear el esquema mediante las migraciones versionadas:
 
-## Deploy on Vercel
+```bash
+pnpm db:deploy
+pnpm db:generate
+pnpm db:seed
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+El seed es idempotente y crea, si no existen:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Local principal.
+- Categorías comerciales iniciales.
+- Usuario administrador indicado en las variables `SEED_ADMIN_*`.
+
+La contraseña se almacena mediante scrypt. El módulo definitivo de autenticación se implementará en la épica E01.
+
+## Base local histórica
+
+El repositorio original contenía `dev.db` sin historial de migraciones. No se debe ejecutar la migración inicial sobre esa base como si estuviera vacía.
+
+Para conservar información existente:
+
+1. Realizar una copia de seguridad de `dev.db`.
+2. Verificar que su estructura coincide con `prisma/schema.prisma`.
+3. Marcar la migración inicial como aplicada:
+
+```bash
+pnpm exec prisma migrate resolve --applied 20260808000000_initial
+```
+
+Este procedimiento solo establece la línea base; no modifica tablas ni corrige diferencias existentes.
+
+## Desarrollo
+
+```bash
+pnpm dev
+```
+
+Abrir [http://localhost:3000](http://localhost:3000).
+
+## Verificaciones
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm build
+```
+
+O ejecutar la verificación completa:
+
+```bash
+pnpm check
+```
+
+## Scripts disponibles
+
+| Comando | Uso |
+|---|---|
+| `pnpm dev` | Servidor de desarrollo |
+| `pnpm build` | Compilación de producción |
+| `pnpm start` | Servidor de producción |
+| `pnpm lint` | Revisión ESLint |
+| `pnpm typecheck` | Verificación TypeScript |
+| `pnpm check` | Tipos, lint y build |
+| `pnpm db:generate` | Generar Prisma Client |
+| `pnpm db:migrate` | Crear/aplicar migraciones en desarrollo |
+| `pnpm db:deploy` | Aplicar migraciones versionadas |
+| `pnpm db:seed` | Crear datos mínimos iniciales |
+| `pnpm db:studio` | Abrir Prisma Studio |
+
+## Arquitectura
+
+Las rutas se encuentran en `src/app` y la lógica se organiza por negocio en `src/modules`.
+
+```text
+src/
+├── app/                 # Rutas y composición
+├── components/          # UI y layout compartidos
+├── lib/                 # Infraestructura común
+└── modules/
+    └── <modulo>/
+        ├── actions/     # Adaptadores use server
+        ├── components/  # Interfaz del módulo
+        ├── repositories/# Consultas y persistencia
+        └── services/    # Casos de uso y reglas
+```
+
+Consultar [src/modules/README.md](src/modules/README.md) para las reglas de dependencia.
+
+## Flujo de trabajo
+
+- [Backlog del MVP](docs/MVP_BACKLOG.md)
+- [Contrato Gitflow](docs/GITFLOW_CONTRACT.md)
+
+El desarrollo se realiza mediante:
+
+```text
+main → develop → epic/* → feature/*
+```
+
+Las ramas `release/*` se crean desde `develop` durante la estabilización.
+
+## Variables de entorno
+
+| Variable | Obligatoria | Descripción |
+|---|---:|---|
+| `DATABASE_URL` | Sí | URL SQLite usada por Prisma |
+| `SEED_ADMIN_EMAIL` | Para seed | Correo del administrador inicial |
+| `SEED_ADMIN_PASSWORD` | Para seed | Contraseña inicial; debe cambiarse |
+| `SEED_ADMIN_NAME` | Para seed | Nombre del administrador inicial |
+
+No se deben confirmar archivos `.env`, bases con información real, certificados ni credenciales.
