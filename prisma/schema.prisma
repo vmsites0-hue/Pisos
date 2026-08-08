@@ -23,6 +23,20 @@ model Usuario {
 
   sucursal    Sucursal? @relation(fields: [sucursalId], references: [id])
   ventas      Venta[]
+  sesiones    Sesion[]
+}
+
+model Sesion {
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
+  usuarioId Int
+  expiraEn  DateTime
+  creadoEn  DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@index([expiraEn])
 }
 
 // ==========================================

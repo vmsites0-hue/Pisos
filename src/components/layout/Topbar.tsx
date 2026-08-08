@@ -1,6 +1,14 @@
-import { Bell, Search, Store } from "lucide-react";
+import { Bell, LogOut, Search, Store } from "lucide-react";
+import { logoutAction } from "@/modules/auth/actions/auth.actions";
 
-export function Topbar() {
+export function Topbar({ userName }: { userName: string }) {
+  const initials = userName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+
   return (
     <header className="h-16 border-b bg-white flex items-center justify-between px-6 sticky top-0 z-10 w-full">
       <div className="flex-1 max-w-xl flex items-center gap-2 bg-slate-50 rounded-md px-3 py-1.5 border border-slate-200">
@@ -23,9 +31,14 @@ export function Topbar() {
           <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
         </button>
         
-        <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-medium">
-          JS
+        <div title={userName} className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-medium">
+          {initials}
         </div>
+        <form action={logoutAction}>
+          <button type="submit" title="Cerrar sesión" className="text-slate-500 hover:text-slate-900">
+            <LogOut size={20} />
+          </button>
+        </form>
       </div>
     </header>
   );
