@@ -50,7 +50,9 @@ El seed es idempotente y crea, si no existen:
 - Categorías comerciales iniciales.
 - Usuario administrador indicado en las variables `SEED_ADMIN_*`.
 
-La contraseña se almacena mediante scrypt. El módulo definitivo de autenticación se implementará en la épica E01.
+La contraseña se almacena mediante scrypt. Después del seed, se inicia sesión en
+`/login` con `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD`. Las sesiones duran 12
+horas, pueden revocarse en la base y dejan de ser válidas si el usuario se desactiva.
 
 ## Base local histórica
 

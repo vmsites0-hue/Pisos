@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireAuthenticatedUser } from "@/modules/auth/services/session.service";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -18,6 +19,8 @@ export interface VentaInput {
 }
 
 export async function procesarVenta(input: VentaInput) {
+  const authenticatedUser = await requireAuthenticatedUser();
+
   try {
     const { sucursalId, clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles } = input;
 
@@ -25,20 +28,7 @@ export async function procesarVenta(input: VentaInput) {
       return { error: "Faltan datos obligatorios para procesar la venta." };
     }
 
-    // Asegurar que exista al menos un usuario vendedor en la BD para relacionar la venta
-    let usuario = await prisma.usuario.findFirst();
-    if (!usuario) {
-      usuario = await prisma.usuario.create({
-        data: {
-          nombre: "Vendedor Central",
-          email: "vendedor@erpiso.com",
-          password: "default_vendedor_pwd", // En un entorno real se cifraría
-          rol: "VENDEDOR",
-          activo: true,
-        },
-      });
-    }
-    const usuarioId = usuario.id;
+    const usuarioId = authenticatedUser.id;
 
     // Ejecutar transacción
     const ventaProcesada = await prisma.$transaction(async (tx) => {
