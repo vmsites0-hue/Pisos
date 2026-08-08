@@ -58,11 +58,6 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
   // Estado de descarga PDF
   const [downloading, setDownloading] = useState(false);
 
-  // Estado de Factura Electrónica SIFEN (Paraguay)
-  const [sifenLoading, setSifenLoading] = useState(false);
-  const [sifenSuccess, setSifenSuccess] = useState(false);
-  const [sifenCDC, setSifenCDC] = useState("");
-
   const handleDownloadPDF = async () => {
     if (!createdVenta) return;
     setDownloading(true);
@@ -84,22 +79,12 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
       const imgWidth = 190;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
-      pdf.save(`venta-${createdVenta.id}.pdf`);
+      pdf.save(`comprobante-interno-venta-${createdVenta.id}.pdf`);
     } catch (err) {
       console.error(err);
     } finally {
       setDownloading(false);
     }
-  };
-
-  const handleEmitirFacturaSifen = () => {
-    setSifenLoading(true);
-    setTimeout(() => {
-      setSifenLoading(false);
-      setSifenSuccess(true);
-      const randomCDC = "012026" + Math.floor(10000000000000000000000000000000000000 + Math.random() * 90000000000000000000000000000000000000).toString().padStart(38, "7");
-      setSifenCDC(randomCDC.substring(0, 44));
-    }, 1500);
   };
 
   // Inicializar sucursal por defecto
@@ -355,8 +340,6 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
       setDescuentoManual(0);
       setDescuentoAuto(0);
       setReglaAplicada(null);
-      setSifenSuccess(false);
-      setSifenCDC("");
       setShowReceipt(true);
     }
   }
@@ -803,6 +786,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
             <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs font-mono">
               <div className="text-center space-y-1">
                 <h5 className="font-bold text-sm">ERPISO S.A.</h5>
+                <p className="font-bold uppercase tracking-wide">Comprobante interno no fiscal</p>
                 <p className="text-slate-500">Sucursal: {createdVenta.sucursal.nombre}</p>
                 <p className="text-slate-500">Fecha: {new Date(createdVenta.fecha).toLocaleString("es-PY")}</p>
               </div>
@@ -846,39 +830,9 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
                   <span>- {formatMoney(createdVenta.descuento)}</span>
                 </div>
                 <div className="flex justify-between font-bold text-sm border-t border-double pt-1">
-                  <span>Total Facturado:</span>
+                  <span>Total de la venta:</span>
                   <span>{formatMoney(createdVenta.total)}</span>
                 </div>
-              </div>
-
-              {/* Factura Electrónica SIFEN Paraguay */}
-              <div className="border-t border-dashed pt-4 mt-2 no-print">
-                {sifenSuccess ? (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-emerald-800 space-y-1 text-center font-sans">
-                    <div className="font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-1">
-                      <CheckCircle size={12} className="text-emerald-600" />
-                      <span>Factura Electrónica Emitida</span>
-                    </div>
-                    <div className="text-[9px] text-slate-500 font-mono break-all mt-1">
-                      <strong>CDC:</strong> {sifenCDC}
-                    </div>
-                    <div className="text-[9px] text-slate-500">
-                      <strong>Timbrado:</strong> 16293412 | <strong>KUDE:</strong> QR Digital OK
-                    </div>
-                  </div>
-                ) : sifenLoading ? (
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center text-slate-500 font-sans animate-pulse">
-                    <span className="text-[10px] font-semibold">Comunicando a SIFEN (SET Paraguay)...</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleEmitirFacturaSifen}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold py-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 font-sans"
-                  >
-                    <CheckCircle size={12} />
-                    <span>Verificar y Generar Factura Electrónica</span>
-                  </button>
-                )}
               </div>
 
             </div>
