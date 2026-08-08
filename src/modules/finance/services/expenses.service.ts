@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requirePermission } from "@/modules/auth/services/access.service";
+import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 
 export async function registrarGasto(formData: FormData) {
+  await requirePermission(PERMISSIONS.EXPENSES_CREATE);
   try {
     const descripcion = (formData.get("descripcion") as string)?.trim();
     const monto = parseFloat(formData.get("monto") as string);
@@ -28,6 +31,7 @@ export async function registrarGasto(formData: FormData) {
 }
 
 export async function eliminarGasto(id: number) {
+  await requirePermission(PERMISSIONS.EXPENSES_DELETE);
   try {
     await prisma.gasto.delete({
       where: { id },

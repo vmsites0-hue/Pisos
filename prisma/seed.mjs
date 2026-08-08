@@ -21,6 +21,40 @@ function hashPassword(password) {
 const adapter = new PrismaBetterSqlite3({ url: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
+const permissions = [
+  ["users.manage", "Administrar usuarios"],
+  ["roles.manage", "Administrar roles y permisos"],
+  ["branches.manage", "Administrar el local"],
+  ["customers.manage", "Administrar clientes"],
+  ["products.manage", "Administrar productos y categorías"],
+  ["inventory.adjust", "Realizar ajustes de inventario"],
+  ["quotations.manage", "Administrar presupuestos"],
+  ["sales.create", "Confirmar ventas"],
+  ["discounts.manage", "Administrar promociones"],
+  ["logistics.update", "Actualizar entregas"],
+  ["expenses.create", "Registrar gastos"],
+  ["expenses.delete", "Eliminar gastos"],
+  ["payments.create", "Registrar cobros"],
+];
+
+const roles = [
+  ["ADMINISTRADOR", "Administrador"],
+  ["VENDEDOR", "Vendedor"],
+  ["DEPOSITO", "Depósito"],
+  ["LOGISTICA", "Logística"],
+  ["CHOFER", "Chofer"],
+  ["FINANZAS", "Finanzas"],
+];
+
+const rolePermissions = {
+  ADMINISTRADOR: permissions.map(([code]) => code),
+  VENDEDOR: ["customers.manage", "quotations.manage", "sales.create"],
+  DEPOSITO: ["products.manage", "inventory.adjust"],
+  LOGISTICA: ["logistics.update"],
+  CHOFER: ["logistics.update"],
+  FINANZAS: ["expenses.create", "expenses.delete", "payments.create"],
+};
+
 async function main() {
   let mainBranch = await prisma.sucursal.findFirst({
     where: { nombre: "Local principal" },
@@ -43,22 +77,58 @@ async function main() {
     });
   }
 
-  const existingAdmin = await prisma.usuario.findUnique({
+  for (const [code, description] of permissions) {
+    await prisma.permiso.upsert({
+      where: { codigo: code },
+      update: { descripcion: description },
+      create: { codigo: code, descripcion: description },
+    });
+  }
+
+  for (const [code, name] of roles) {
+    const role = await prisma.rol.upsert({
+      where: { codigo: code },
+      update: { nombre: name },
+      create: { codigo: code, nombre: name },
+    });
+    const assignedPermissions = rolePermissions[code] ?? [];
+
+    for (const permissionCode of assignedPermissions) {
+      const permission = await prisma.permiso.findUniqueOrThrow({
+        where: { codigo: permissionCode },
+      });
+      await prisma.rolPermiso.upsert({
+        where: { rolId_permisoId: { rolId: role.id, permisoId: permission.id } },
+        update: {},
+        create: { rolId: role.id, permisoId: permission.id },
+      });
+    }
+  }
+
+  let admin = await prisma.usuario.findUnique({
     where: { email: adminEmail },
   });
 
-  if (!existingAdmin) {
-    await prisma.usuario.create({
+  if (!admin) {
+    admin = await prisma.usuario.create({
       data: {
         nombre: adminName,
         email: adminEmail,
         password: hashPassword(adminPassword),
-        rol: "ADMINISTRADOR",
         sucursalId: mainBranch.id,
         activo: true,
       },
     });
   }
+
+  const adminRole = await prisma.rol.findUniqueOrThrow({
+    where: { codigo: "ADMINISTRADOR" },
+  });
+  await prisma.usuarioRol.upsert({
+    where: { usuarioId_rolId: { usuarioId: admin.id, rolId: adminRole.id } },
+    update: {},
+    create: { usuarioId: admin.id, rolId: adminRole.id },
+  });
 
   console.info(`Seed completado. Local principal: ${mainBranch.nombre}. Admin: ${adminEmail}.`);
 }

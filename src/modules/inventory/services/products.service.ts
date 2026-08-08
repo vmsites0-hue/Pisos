@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requirePermission } from "@/modules/auth/services/access.service";
+import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 
 export async function createProducto(formData: FormData) {
+  await requirePermission(PERMISSIONS.PRODUCTS_MANAGE);
   try {
     const codigo = (formData.get("codigo") as string)?.trim();
     const codigoBarras = (formData.get("codigoBarras") as string)?.trim() || null;
@@ -68,6 +71,7 @@ export async function createProducto(formData: FormData) {
 }
 
 export async function updateProducto(id: number, formData: FormData) {
+  await requirePermission(PERMISSIONS.PRODUCTS_MANAGE);
   try {
     const codigo = (formData.get("codigo") as string)?.trim();
     const codigoBarras = (formData.get("codigoBarras") as string)?.trim() || null;
@@ -135,6 +139,7 @@ export async function updateProducto(id: number, formData: FormData) {
 }
 
 export async function deleteProducto(id: number) {
+  await requirePermission(PERMISSIONS.PRODUCTS_MANAGE);
   try {
     // Verificar si el producto se ha vendido
     const ventasCount = await prisma.detalleVenta.count({

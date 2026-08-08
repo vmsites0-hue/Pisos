@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requirePermission } from "@/modules/auth/services/access.service";
+import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 
 export async function actualizarEstadoEnvio(
   ventaId: number, 
@@ -7,6 +9,7 @@ export async function actualizarEstadoEnvio(
   chofer?: string | null,
   observaciones?: string | null
 ) {
+  await requirePermission(PERMISSIONS.LOGISTICS_UPDATE);
   try {
     const validStates = ["PENDIENTE", "ENCARGADO", "DESPACHADO", "ENTREGADO"];
     if (!validStates.includes(nuevoEstado)) {

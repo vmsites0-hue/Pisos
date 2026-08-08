@@ -15,7 +15,6 @@ model Usuario {
   nombre      String
   email       String    @unique
   password    String    // Hashed
-  rol         String    @default("VENDEDOR")
   sucursalId  Int?
   activo      Boolean   @default(true)
   creadoEn    DateTime  @default(now())
@@ -24,6 +23,41 @@ model Usuario {
   sucursal    Sucursal? @relation(fields: [sucursalId], references: [id])
   ventas      Venta[]
   sesiones    Sesion[]
+  roles       UsuarioRol[]
+}
+
+model Rol {
+  id          Int          @id @default(autoincrement())
+  codigo      String       @unique
+  nombre      String
+  activo      Boolean      @default(true)
+  usuarios    UsuarioRol[]
+  permisos    RolPermiso[]
+}
+
+model Permiso {
+  id          Int          @id @default(autoincrement())
+  codigo      String       @unique
+  descripcion String
+  roles       RolPermiso[]
+}
+
+model UsuarioRol {
+  usuarioId Int
+  rolId     Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  rol       Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, rolId])
+}
+
+model RolPermiso {
+  rolId     Int
+  permisoId Int
+  rol       Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+  permiso   Permiso @relation(fields: [permisoId], references: [id], onDelete: Cascade)
+
+  @@id([rolId, permisoId])
 }
 
 model Sesion {

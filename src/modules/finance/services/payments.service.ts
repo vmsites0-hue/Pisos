@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requirePermission } from "@/modules/auth/services/access.service";
+import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 
 export async function registrarPagoCliente(clienteId: number, monto: number) {
+  await requirePermission(PERMISSIONS.PAYMENTS_CREATE);
   try {
     if (isNaN(clienteId) || isNaN(monto) || monto <= 0) {
       return { error: "Monto o ID de cliente inválido." };
