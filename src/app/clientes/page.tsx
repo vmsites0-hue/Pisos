@@ -1,15 +1,8 @@
-import { prisma } from "@/lib/prisma";
-import { ClientesClient } from "@/components/clientes/ClientesClient";
+import { ClientesClient } from "@/modules/customers/components/ClientesClient";
+import { getCustomersPageData } from "@/modules/customers/repositories/customers.repository";
 
 export default async function ClientesPage() {
-  // Obtener todos los clientes ordenados por creación
-  const clientes = await prisma.cliente.findMany({
-    orderBy: {
-      creadoEn: "desc",
-    },
-  });
+  const customers = await getCustomersPageData();
 
-  return (
-    <ClientesClient clientes={clientes} />
-  );
+  return <ClientesClient clientes={customers} />;
 }

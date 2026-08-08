@@ -1,36 +1,17 @@
-import { prisma } from "@/lib/prisma";
+import { getDashboardData } from "@/modules/dashboard/repositories/dashboard.repository";
 import { Package, ShoppingCart, TrendingUp, Users, Store, Clock, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 export default async function DashboardPage() {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  // 1. Obtener ventas del día de hoy
-  const ventasHoy = await prisma.venta.findMany({
-    where: {
-      fecha: {
-        gte: todayStart,
-      },
-    },
-  });
+  const {
+    todaySales: ventasHoy,
+    pendingOrders: pedidosPendientes,
+    products: productos,
+    newCustomers: nuevosClientesHoy,
+    recentSales: ventasRecientes,
+  } = await getDashboardData();
 
   const totalVentasHoy = ventasHoy.reduce((acc, curr) => acc + curr.total, 0);
-
-  // 2. Pedidos pendientes de entrega (logística)
-  const pedidosPendientes = await prisma.venta.count({
-    where: {
-      estado: "PENDIENTE",
-    },
-  });
-
-  // 3. Productos y sus inventarios consolidados para evaluar stock crítico
-  const productos = await prisma.producto.findMany({
-    include: {
-      inventarios: true,
-      categoria: true,
-    },
-  });
 
   const productosBajoStock = productos.filter((prod) => {
     const stockConsolidado = prod.inventarios.reduce((sum, inv) => sum + inv.stockActual, 0);
@@ -38,27 +19,6 @@ export default async function DashboardPage() {
   });
 
   const countBajoStock = productosBajoStock.length;
-
-  // 4. Nuevos clientes agregados hoy
-  const nuevosClientesHoy = await prisma.cliente.count({
-    where: {
-      creadoEn: {
-        gte: todayStart,
-      },
-    },
-  });
-
-  // 5. Últimas 5 ventas
-  const ventasRecientes = await prisma.venta.findMany({
-    take: 5,
-    orderBy: {
-      fecha: "desc",
-    },
-    include: {
-      cliente: true,
-      sucursal: true,
-    },
-  });
 
   // Formateador de moneda (Gs.)
   const formatMoney = (val: number) => {

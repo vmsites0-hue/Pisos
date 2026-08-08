@@ -1,28 +1,18 @@
-import { prisma } from "@/lib/prisma";
-import { SucursalForm } from "@/components/sucursales/SucursalForm";
-import { ConfiguracionClient } from "@/components/configuracion/ConfiguracionClient";
+import { SucursalForm } from "@/modules/branches/components/SucursalForm";
+import { ConfiguracionClient } from "@/modules/settings/components/ConfiguracionClient";
+import { getSettingsPageData } from "@/modules/settings/repositories/settings.repository";
 
 export default async function ConfiguracionPage() {
-  const sucursales = await prisma.sucursal.findMany({
-    orderBy: { creadoEn: 'desc' }
-  });
-
-  const reglas = await prisma.reglaDescuento.findMany({
-    orderBy: { creadoEn: 'desc' }
-  });
-
-  const categories = await prisma.categoria.findMany({
-    orderBy: { nombre: 'asc' }
-  });
+  const { branches, discountRules, categories } = await getSettingsPageData();
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
         <SucursalForm />
       </div>
-      <ConfiguracionClient 
-        sucursales={sucursales} 
-        reglas={reglas}
+      <ConfiguracionClient
+        sucursales={branches}
+        reglas={discountRules}
         categories={categories}
       />
     </div>
