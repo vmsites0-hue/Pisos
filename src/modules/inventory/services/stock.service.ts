@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requirePermission } from "@/modules/auth/services/access.service";
+import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 
 export async function ajustarStock(formData: FormData) {
+  await requirePermission(PERMISSIONS.INVENTORY_ADJUST);
   try {
     const productoId = parseInt(formData.get("productoId") as string);
     const sucursalId = parseInt(formData.get("sucursalId") as string);

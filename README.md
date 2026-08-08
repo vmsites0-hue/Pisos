@@ -54,6 +54,11 @@ La contraseña se almacena mediante scrypt. Después del seed, se inicia sesión
 `/login` con `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD`. Las sesiones duran 12
 horas, pueden revocarse en la base y dejan de ser válidas si el usuario se desactiva.
 
+En `/configuracion` el administrador puede crear empleados, asignarles varios
+roles, cambiar el nombre visible de los roles y configurar sus permisos. Los
+códigos internos de permisos son estables y todas las mutaciones se autorizan
+de nuevo en el servidor.
+
 ## Base local histórica
 
 El repositorio original contenía `dev.db` sin historial de migraciones. No se debe ejecutar la migración inicial sobre esa base como si estuviera vacía.

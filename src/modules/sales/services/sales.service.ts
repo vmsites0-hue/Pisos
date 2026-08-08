@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireAuthenticatedUser } from "@/modules/auth/services/session.service";
+import { requirePermission } from "@/modules/auth/services/access.service";
+import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -19,7 +20,7 @@ export interface VentaInput {
 }
 
 export async function procesarVenta(input: VentaInput) {
-  const authenticatedUser = await requireAuthenticatedUser();
+  const authenticatedUser = await requirePermission(PERMISSIONS.SALES_CREATE);
 
   try {
     const { sucursalId, clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles } = input;

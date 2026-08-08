@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requirePermission } from "@/modules/auth/services/access.service";
+import { PERMISSIONS } from "@/modules/auth/domain/permissions";
+import { requireAuthenticatedUser } from "@/modules/auth/services/session.service";
 
 export async function getReglasDescuento() {
+  await requireAuthenticatedUser();
   return await prisma.reglaDescuento.findMany({
     where: { activa: true },
     orderBy: { creadoEn: "desc" },
@@ -9,6 +13,7 @@ export async function getReglasDescuento() {
 }
 
 export async function createReglaDescuento(formData: FormData) {
+  await requirePermission(PERMISSIONS.DISCOUNTS_MANAGE);
   const nombre = formData.get("nombre") as string;
   const tipo = formData.get("tipo") as string;
   const categoriaIdStr = formData.get("categoriaId") as string;
@@ -39,6 +44,7 @@ export async function createReglaDescuento(formData: FormData) {
 }
 
 export async function deleteReglaDescuento(id: number) {
+  await requirePermission(PERMISSIONS.DISCOUNTS_MANAGE);
   try {
     await prisma.reglaDescuento.delete({ where: { id } });
     revalidatePath("/configuracion");
@@ -50,6 +56,7 @@ export async function deleteReglaDescuento(id: number) {
 }
 
 export async function toggleReglaDescuento(id: number, activa: boolean) {
+  await requirePermission(PERMISSIONS.DISCOUNTS_MANAGE);
   try {
     await prisma.reglaDescuento.update({
       where: { id },
@@ -73,6 +80,7 @@ export interface CartItemForDiscount {
 }
 
 export async function calcularDescuentoAutomatico(items: CartItemForDiscount[]) {
+  await requireAuthenticatedUser();
   const reglas = await prisma.reglaDescuento.findMany({
     where: { activa: true },
   });
