@@ -33,6 +33,7 @@ model Usuario {
   reservasCreadas        ReservaStock[]
   cancelacionesVenta     CancelacionVenta[]
   devoluciones           Devolucion[]
+  pagosCuota             PagoCuota[]
 }
 
 model Rol {
@@ -752,7 +753,21 @@ model CuotaCredito {
   pagado         Float    @default(0)
   estado         String   @default("PENDIENTE")
   creditoVenta   CreditoVenta @relation(fields: [creditoVentaId], references: [id], onDelete: Cascade)
+  pagos          PagoCuota[]
 
   @@unique([creditoVentaId, numero])
   @@index([estado, venceEn])
+}
+
+model PagoCuota {
+  id          Int      @id @default(autoincrement())
+  cuotaId     Int
+  usuarioId   Int
+  monto       Float
+  metodoPago  String
+  fecha       DateTime @default(now())
+  cuota       CuotaCredito @relation(fields: [cuotaId], references: [id])
+  usuario     Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([cuotaId, fecha])
 }
