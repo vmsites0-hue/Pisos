@@ -49,7 +49,7 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
   const totalCuentasPorCobrar = debtorClients.reduce((acc, curr) => acc + curr.saldoDeudor, 0);
 
   // Total de gastos registrados
-  const totalGastos = gastos.reduce((acc, curr) => acc + curr.monto, 0);
+  const totalGastos = gastos.filter((expense) => expense.estado !== "ANULADO").reduce((acc, curr) => acc + curr.monto, 0);
 
   // Saldo Neto Diario / Balance General
   const saldoNeto = totalRevenue - totalGastos;
@@ -104,12 +104,16 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
     }
   }
 
-  // Eliminar un gasto
+  // Anular un gasto conservando su trazabilidad
   async function handleDeleteGasto(id: number, desc: string) {
-    if (!confirm(`¿Estás seguro de eliminar el gasto "${desc}"?`)) return;
-    const res = await eliminarGasto(id);
+    const motivo = prompt(`Motivo para anular el gasto "${desc}":`);
+    if (!motivo) return;
+    const approvalText = prompt("ID de aprobación autorizada (vacío para crear la solicitud):");
+    const res = await eliminarGasto(id, motivo, approvalText ? Number(approvalText) : undefined);
     if (res.error) {
       alert(res.error);
+    } else if (res.approvalRequired) {
+      alert(`Solicitud #${res.approvalRequestId} creada. Tras aprobarla, repetí la anulación indicando ese ID.`);
     }
   }
 
@@ -283,18 +287,19 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
                         <td className="px-3 py-3">
                           <span className="font-semibold text-slate-900 block">{g.descripcion}</span>
                           {g.categoria && <span className="inline-block mt-0.5 text-[9px] uppercase bg-slate-100 px-1 border rounded text-slate-600">{g.categoria}</span>}
+                          <span className={`ml-1 text-[9px] font-bold ${g.estado === "ANULADO" ? "text-red-600" : "text-emerald-600"}`}>{g.estado}</span>
                         </td>
                         <td className="px-3 py-3 text-right font-bold text-red-600">
                           {formatMoney(g.monto)}
                         </td>
                         <td className="px-3 py-3 text-center">
-                          <button
+                          {g.estado !== "ANULADO" && <button
                             onClick={() => handleDeleteGasto(g.id, g.descripcion)}
                             className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors inline-block cursor-pointer"
-                            title="Eliminar Gasto"
+                            title="Solicitar anulación"
                           >
                             <Trash2 size={14} />
-                          </button>
+                          </button>}
                         </td>
                       </tr>
                     ))
@@ -345,6 +350,17 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Monto a Cobrar *</label>
                   <input required name="monto" type="number" min="1000" step="1000" max={selectedClient.saldoDeudor} defaultValue={selectedClient.saldoDeudor} className="w-full border rounded p-2 text-xs bg-white font-bold outline-none focus:border-slate-400" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Método de pago</label>
+                  <select name="metodoPago" className="w-full border rounded p-2 text-xs bg-white"><option>EFECTIVO</option><option>TARJETA</option><option>TRANSFERENCIA</option></select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Comprobante (URL)</label>
+                  <input name="comprobanteUrl" type="url" placeholder="Opcional" className="w-full border rounded p-2 text-xs bg-white" />
                 </div>
               </div>
 
