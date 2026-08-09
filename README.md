@@ -59,6 +59,11 @@ roles, cambiar el nombre visible de los roles y configurar sus permisos. Los
 códigos internos de permisos son estables y todas las mutaciones se autorizan
 de nuevo en el servidor.
 
+La bandeja `/aprobaciones` gestiona autorizaciones para descuentos fuera de
+límite, cambios manuales de precio, ajustes negativos, cancelaciones,
+devoluciones y eliminación de gastos. Por defecto nadie puede aprobar su propia
+solicitud y cada aprobación puede consumirse una sola vez.
+
 ## Base local histórica
 
 El repositorio original contenía `dev.db` sin historial de migraciones. No se debe ejecutar la migración inicial sobre esa base como si estuviera vacía.

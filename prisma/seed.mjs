@@ -35,6 +35,8 @@ const permissions = [
   ["expenses.create", "Registrar gastos"],
   ["expenses.delete", "Eliminar gastos"],
   ["payments.create", "Registrar cobros"],
+  ["approvals.review", "Aprobar o rechazar operaciones restringidas"],
+  ["approvals.policy.manage", "Configurar políticas de aprobación"],
 ];
 
 const roles = [
@@ -128,6 +130,12 @@ async function main() {
     where: { usuarioId_rolId: { usuarioId: admin.id, rolId: adminRole.id } },
     update: {},
     create: { usuarioId: admin.id, rolId: adminRole.id },
+  });
+
+  await prisma.politicaAprobacion.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { id: 1, permitirAutoAprobacion: false },
   });
 
   console.info(`Seed completado. Local principal: ${mainBranch.nombre}. Admin: ${adminEmail}.`);
