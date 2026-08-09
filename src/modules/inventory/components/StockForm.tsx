@@ -17,6 +17,7 @@ export function StockForm({ isOpen, onClose, products, sucursales, preselectedPr
   const [error, setError] = useState<string | null>(null);
   
   const [productoId, setProductoId] = useState<number>(0);
+  const [varianteId, setVarianteId] = useState<number>(0);
   const [sucursalId, setSucursalId] = useState<number>(0);
   const [tipoAjuste, setTipoAjuste] = useState("SUMAR"); // SUMAR, RESTAR, FIJAR
   
@@ -27,6 +28,7 @@ export function StockForm({ isOpen, onClose, products, sucursales, preselectedPr
 
   // Obtener detalles del producto seleccionado
   const selectedProduct = products.find(p => p.id === productoId);
+  const selectedVariant = selectedProduct?.variantes?.find((variant: any) => variant.id === varianteId) ?? selectedProduct?.variantes?.[0];
   const isM2Product = selectedProduct?.unidadVenta === "M2";
   const isCajaProduct = selectedProduct?.unidadVenta === "CAJA";
   const m2PorCaja = selectedProduct?.m2PorCaja || null;
@@ -35,8 +37,10 @@ export function StockForm({ isOpen, onClose, products, sucursales, preselectedPr
   useEffect(() => {
     if (preselectedProductId) {
       setProductoId(preselectedProductId);
+      setVarianteId(products.find((product) => product.id === preselectedProductId)?.variantes?.[0]?.id ?? 0);
     } else if (products.length > 0) {
       setProductoId(products[0].id);
+      setVarianteId(products[0].variantes?.[0]?.id ?? 0);
     }
     
     if (sucursales.length > 0) {
@@ -152,7 +156,7 @@ export function StockForm({ isOpen, onClose, products, sucursales, preselectedPr
               required
               name="productoId"
               value={productoId}
-              onChange={(e) => setProductoId(parseInt(e.target.value))}
+              onChange={(e) => { const id = parseInt(e.target.value); setProductoId(id); setVarianteId(products.find((product) => product.id === id)?.variantes?.[0]?.id ?? 0); }}
               disabled={!!preselectedProductId}
               className="w-full border rounded-md p-2 text-sm outline-none focus:border-slate-400 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed"
             >
@@ -165,6 +169,14 @@ export function StockForm({ isOpen, onClose, products, sucursales, preselectedPr
             </select>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Variante *</label>
+            <select required name="varianteId" value={varianteId} onChange={(e) => setVarianteId(Number(e.target.value))} className="w-full rounded-md border bg-white p-2 text-sm">
+              <option value={0} disabled>Seleccionar variante...</option>
+              {(selectedProduct?.variantes ?? []).map((variant: any) => <option key={variant.id} value={variant.id}>{variant.sku}{variant.nombre ? ` - ${variant.nombre}` : ""}</option>)}
+            </select>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Local</label>
@@ -174,15 +186,10 @@ export function StockForm({ isOpen, onClose, products, sucursales, preselectedPr
               </div>
             </div>
 
-            {/* Lote / Tono */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Lote / Tono (Opcional)</label>
-              <input
-                name="loteTono"
-                type="text"
-                placeholder="Ej. T18-A o Calibre 4"
-                className="w-full border rounded-md p-2 text-sm outline-none focus:border-slate-400 uppercase"
-              />
+            <div className="grid grid-cols-3 gap-2">
+              <label className="text-xs font-medium text-slate-700">Lote<input name="lote" type="text" className="mt-1 w-full rounded-md border p-2 text-sm uppercase" /></label>
+              <label className="text-xs font-medium text-slate-700">Tono<input name="tono" type="text" className="mt-1 w-full rounded-md border p-2 text-sm uppercase" /></label>
+              <label className="text-xs font-medium text-slate-700">Calibre<input name="calibre" type="text" className="mt-1 w-full rounded-md border p-2 text-sm uppercase" /></label>
             </div>
           </div>
 
@@ -209,12 +216,18 @@ export function StockForm({ isOpen, onClose, products, sucursales, preselectedPr
                 <div className="p-2.5 bg-slate-50 border rounded-md text-xs text-slate-600">
                   <span className="font-semibold block mb-0.5">Configuración de Venta:</span>
                   Unidad: <span className="font-semibold">{selectedProduct.unidadVenta}</span>
+                  {selectedVariant && <span className="block mt-0.5">Variante: <span className="font-semibold">{selectedVariant.sku}</span></span>}
                   {selectedProduct.m2PorCaja && (
                     <span className="block mt-0.5">Relación: <span className="font-semibold">{selectedProduct.m2PorCaja} m² por caja</span></span>
                   )}
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div><label className="mb-1 block text-sm font-medium text-slate-700">Motivo *</label><input required name="motivo" placeholder="Compra, conteo físico, rotura…" className="w-full rounded-md border p-2 text-sm" /></div>
+            <div><label className="mb-1 block text-sm font-medium text-slate-700">ID de aprobación (si reduce stock)</label><input name="approvalId" type="number" min="1" className="w-full rounded-md border p-2 text-sm" /></div>
           </div>
 
           {/* Cantidades con conversión interactiva */}

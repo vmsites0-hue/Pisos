@@ -8,16 +8,16 @@ export default async function DashboardPage() {
   const {
     todaySales: ventasHoy,
     pendingOrders: pedidosPendientes,
-    products: productos,
+    criticalVariants,
     newCustomers: nuevosClientesHoy,
     recentSales: ventasRecientes,
   } = await getDashboardData();
 
   const totalVentasHoy = ventasHoy.reduce((acc, curr) => acc + curr.total, 0);
 
-  const productosBajoStock = productos.filter((prod) => {
-    const stockConsolidado = prod.inventarios.reduce((sum, inv) => sum + inv.stockActual, 0);
-    return stockConsolidado <= prod.stockMinimo;
+  const productosBajoStock = criticalVariants.filter((variant) => {
+    const available = variant.inventarios.reduce((sum, inventory) => sum + inventory.stockActual - inventory.stockReservado, 0);
+    return available <= variant.stockMinimo;
   });
 
   const countBajoStock = productosBajoStock.length;
@@ -133,18 +133,18 @@ export default async function DashboardPage() {
                 </div>
               ) : (
                 productosBajoStock.map((prod) => {
-                  const stockConsolidado = prod.inventarios.reduce((sum, inv) => sum + inv.stockActual, 0);
+                  const stockConsolidado = prod.inventarios.reduce((sum, inv) => sum + inv.stockActual - inv.stockReservado, 0);
                   
                   return (
                     <div key={prod.id} className="flex items-center justify-between p-3 border rounded-lg hover:border-slate-300 transition-colors">
                       <div>
-                        <span className="text-xs font-bold text-slate-900 block">{prod.codigo}</span>
-                        <span className="text-[10px] text-slate-500 block truncate max-w-[150px]" title={prod.nombre}>
-                          {prod.nombre}
+                        <span className="text-xs font-bold text-slate-900 block">{prod.sku}</span>
+                        <span className="text-[10px] text-slate-500 block truncate max-w-[150px]" title={prod.producto.nombre}>
+                          {prod.producto.nombre}
                         </span>
                       </div>
                       <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full border border-red-200">
-                        {stockConsolidado} {prod.unidadVenta}
+                        {stockConsolidado} {prod.unidadBase?.simbolo ?? "un"}
                       </span>
                     </div>
                   );

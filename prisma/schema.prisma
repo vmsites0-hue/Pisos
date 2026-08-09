@@ -27,6 +27,9 @@ model Usuario {
   aprobacionesSolicitadas SolicitudAprobacion[] @relation("SolicitanteAprobacion")
   aprobacionesResueltas   SolicitudAprobacion[] @relation("AprobadorAprobacion")
   auditorias              RegistroAuditoria[]
+  movimientosInventario  MovimientoInventario[]
+  notificaciones         Notificacion[]
+  eventosPresentacion    EventoPresentacionInventario[]
 }
 
 model Rol {
@@ -261,11 +264,16 @@ model VarianteProducto {
   unidadBaseId    Int?
   politicaVenta   String   @default("UNIDADES_ENTERAS")
   multiploVenta   Float?
+  stockMinimo     Float    @default(0)
 
   producto Producto                @relation(fields: [productoId], references: [id], onDelete: Cascade)
   unidadBase UnidadMedida?         @relation("UnidadBaseVariante", fields: [unidadBaseId], references: [id])
   valores  VarianteAtributoValor[]
   presentaciones PresentacionVariante[]
+  inventarios Inventario[]
+  detallesVenta DetalleVenta[]
+  detallesPresupuesto DetallePresupuesto[]
+  movimientosInventario MovimientoInventario[]
 
   @@index([productoId])
 }
@@ -323,15 +331,85 @@ model Inventario {
   productoId      Int
   sucursalId      Int
   loteTono        String?   // Tono o calibre para cerámicas
+  varianteId      Int?
+  lote             String?
+  tono             String?
+  calibre          String?
   stockActual     Float     @default(0)
   stockReservado  Float     @default(0)
+  alertaMinimoActiva Boolean @default(false)
+  alertaMinimoSecuencia Int @default(0)
+  presentacionesCerradas Int @default(0)
+  remanenteAbierto Float @default(0)
   
   actualizado     DateTime  @updatedAt
 
   producto        Producto  @relation(fields: [productoId], references: [id])
+  variante        VarianteProducto? @relation(fields: [varianteId], references: [id])
   sucursal        Sucursal  @relation(fields: [sucursalId], references: [id])
+  movimientos     MovimientoInventario[]
+  eventosPresentacion EventoPresentacionInventario[]
 
   @@unique([productoId, sucursalId, loteTono])
+  @@index([varianteId, sucursalId, lote, tono, calibre])
+}
+
+model EventoPresentacionInventario {
+  id             Int      @id @default(autoincrement())
+  inventarioId   Int
+  usuarioId      Int
+  tipo           String
+  cantidad       Float
+  remanenteAntes Float
+  remanenteDespues Float
+  motivo         String
+  referenciaTipo String?
+  referenciaId   String?
+  creadoEn       DateTime @default(now())
+
+  inventario Inventario @relation(fields: [inventarioId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([inventarioId, creadoEn])
+}
+
+model MovimientoInventario {
+  id              Int      @id @default(autoincrement())
+  inventarioId    Int
+  varianteId      Int?
+  usuarioId       Int
+  tipo            String
+  cantidad        Float
+  unidadBase      String
+  saldoAnterior   Float
+  saldoResultante Float
+  motivo          String
+  referenciaTipo  String?
+  referenciaId    String?
+  creadoEn        DateTime @default(now())
+
+  inventario Inventario @relation(fields: [inventarioId], references: [id])
+  variante VarianteProducto? @relation(fields: [varianteId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([inventarioId, creadoEn])
+  @@index([varianteId, creadoEn])
+}
+
+model Notificacion {
+  id                Int      @id @default(autoincrement())
+  usuarioId         Int
+  tipo              String
+  titulo            String
+  mensaje           String
+  enlace            String?
+  claveIdempotencia String   @unique
+  leidaEn           DateTime?
+  creadaEn          DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, leidaEn, creadaEn])
 }
 
 // ==========================================
@@ -394,6 +472,7 @@ model DetalleVenta {
   id             Int       @id @default(autoincrement())
   ventaId        Int
   productoId     Int
+  varianteId     Int?
   
   cantidad       Float     // Puede ser m2 o cajas
   cantidadSolicitada Float?
@@ -404,6 +483,7 @@ model DetalleVenta {
   
   venta          Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   producto       Producto  @relation(fields: [productoId], references: [id])
+  variante       VarianteProducto? @relation(fields: [varianteId], references: [id])
 }
 
 // ==========================================
@@ -432,6 +512,7 @@ model DetallePresupuesto {
   id             Int         @id @default(autoincrement())
   presupuestoId  Int
   productoId     Int
+  varianteId     Int?
   
   cantidad       Float
   cantidadSolicitada Float?
@@ -442,6 +523,7 @@ model DetallePresupuesto {
   
   presupuesto    Presupuesto @relation(fields: [presupuestoId], references: [id], onDelete: Cascade)
   producto       Producto    @relation(fields: [productoId], references: [id])
+  variante       VarianteProducto? @relation(fields: [varianteId], references: [id])
 }
 
 // ==========================================

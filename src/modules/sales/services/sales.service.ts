@@ -6,9 +6,14 @@ import { recordAudit } from "@/modules/audit/services/audit.service";
 import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 import { getSystemParameterSnapshot } from "@/modules/settings/services/system-parameters.service";
 import { calculateProductQuantity } from "@/modules/inventory/domain/quantity-conversion";
+import { recordInventoryMovement } from "@/modules/inventory/services/inventory-movements.service";
+import { randomUUID } from "node:crypto";
+import { syncMinimumStockAlert } from "@/modules/inventory/services/minimum-stock.service";
+import { syncPhysicalPackaging } from "@/modules/inventory/services/open-presentations.service";
 
 export interface DetalleVentaInput {
   productoId: number;
+  varianteId?: number | null;
   loteTono: string | null;
   cantidad: number;
   precioUnitario: number;
@@ -27,6 +32,7 @@ export async function procesarVenta(input: VentaInput) {
   const authenticatedUser = await requirePermission(PERMISSIONS.SALES_CREATE);
   const mainBranch = await getMainBranch();
   const configurationSnapshot = await getSystemParameterSnapshot();
+  const operationReference = randomUUID();
 
   try {
     const { clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles } = input;
@@ -55,16 +61,19 @@ export async function procesarVenta(input: VentaInput) {
       for (const item of detalles) {
         const producto = await tx.producto.findUnique({
           where: { id: item.productoId },
-          include: { variantes: { where: { activa: true }, orderBy: { id: "asc" }, take: 1, include: { unidadBase: true, presentaciones: { where: { activa: true }, include: { unidad: true } } } } },
+          include: { variantes: { where: { activa: true, ...(item.varianteId ? { id: item.varianteId } : {}) }, orderBy: { id: "asc" }, include: { unidadBase: true, presentaciones: { where: { activa: true }, include: { unidad: true } } } } },
         });
         if (!producto) {
           throw new Error(`El producto con ID ${item.productoId} no existe.`);
         }
+        const variant = item.varianteId ? producto.variantes.find((candidate) => candidate.id === item.varianteId) : producto.variantes[0];
+        if (!variant) throw new Error(`La variante indicada para "${producto.nombre}" no existe o está inactiva.`);
 
         // Buscar stock en inventario por sucursal y lote/tono
         const inv = await tx.inventario.findFirst({
           where: {
             productoId: item.productoId,
+            varianteId: variant.id,
             sucursalId,
             loteTono: item.loteTono || null,
           },
@@ -88,12 +97,16 @@ export async function procesarVenta(input: VentaInput) {
             },
           },
         });
+        await recordInventoryMovement(tx, { inventoryId: inv!.id, variantId: variant.id, userId: usuarioId, type: "VENTA", quantity: -conversion.actualQuantity, baseUnit: variant.unidadBase?.codigo ?? producto.unidadVenta, previousBalance: stockActual, resultingBalance: stockActual - conversion.actualQuantity, reason: `Venta confirmada para cliente ${clienteId}`, referenceType: "VENTA", referenceId: operationReference });
+        await syncPhysicalPackaging(tx, { inventoryId: inv!.id, previousStock: stockActual, userId: usuarioId, reason: `Consumo por venta para cliente ${clienteId}`, referenceType: "VENTA", referenceId: operationReference });
+        await syncMinimumStockAlert(tx, inv!.id, usuarioId);
 
         const itemSubtotal = conversion.actualQuantity * item.precioUnitario;
         subtotal += itemSubtotal;
 
         detallesToCreate.push({
           productoId: item.productoId,
+          varianteId: variant.id,
           cantidad: conversion.actualQuantity,
           cantidadSolicitada: conversion.requestedQuantity,
           cantidadPresentacion: conversion.presentationQuantity,
@@ -162,6 +175,7 @@ export async function procesarVenta(input: VentaInput) {
           sucursal: true,
         },
       });
+      await tx.movimientoInventario.updateMany({ where: { referenciaTipo: "VENTA", referenciaId: operationReference, usuarioId }, data: { referenciaId: venta.id.toString() } });
 
       await recordAudit({
         userId: usuarioId,

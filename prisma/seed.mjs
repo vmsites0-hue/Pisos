@@ -185,6 +185,7 @@ async function main() {
     ["IMPUESTO_PORCENTAJE", "NUMBER", "10", "Porcentaje impositivo informativo", { min: 0, max: 100 }],
     ["PRESUPUESTO_VALIDEZ_DIAS", "NUMBER", "15", "Vigencia predeterminada de presupuestos", { min: 0, max: 365, integer: true }],
     ["REDONDEO_MODO", "STRING", "NEAREST", "Modo general de redondeo", { options: ["NEAREST", "UP", "DOWN"] }],
+    ["APROBACION_AJUSTE_NEGATIVO", "BOOLEAN", "true", "Exige aprobación para reducir existencias manualmente", {}],
   ];
   for (const [key, type, defaultValue, description, validation] of systemParameters) {
     await prisma.parametroSistema.upsert({

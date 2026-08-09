@@ -14,6 +14,7 @@ export const SYSTEM_PARAMETERS: ParameterDefinition[] = [
   { key: "IMPUESTO_PORCENTAJE", type: "NUMBER", defaultValue: "10", description: "Porcentaje impositivo informativo", validation: { min: 0, max: 100 } },
   { key: "PRESUPUESTO_VALIDEZ_DIAS", type: "NUMBER", defaultValue: "15", description: "Vigencia predeterminada de presupuestos", validation: { min: 0, max: 365, integer: true } },
   { key: "REDONDEO_MODO", type: "STRING", defaultValue: "NEAREST", description: "Modo general de redondeo", validation: { options: ["NEAREST", "UP", "DOWN"] } },
+  { key: "APROBACION_AJUSTE_NEGATIVO", type: "BOOLEAN", defaultValue: "true", description: "Exige aprobación para reducir existencias manualmente", validation: {} },
 ];
 
 export function validateParameterValue(definition: ParameterDefinition, value: string) {

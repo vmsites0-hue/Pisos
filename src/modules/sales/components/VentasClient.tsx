@@ -151,7 +151,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
   const addToCart = (inv: any) => {
     setError(null);
     const existingIndex = cart.findIndex(
-      item => item.productoId === inv.productoId && item.loteTono === inv.loteTono
+      item => item.productoId === inv.productoId && item.varianteId === inv.varianteId && item.loteTono === inv.loteTono
     );
 
     const stockDisponible = inv.stockActual - inv.stockReservado;
@@ -189,6 +189,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
         ...cart,
         {
           productoId: inv.productoId,
+          varianteId: inv.varianteId,
           codigo: inv.producto.codigo,
           nombre: inv.producto.nombre,
           loteTono: inv.loteTono,
@@ -322,6 +323,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
       tipoEntrega,
       detalles: cart.map(item => ({
         productoId: item.productoId,
+        varianteId: item.varianteId,
         loteTono: item.loteTono,
         cantidad: item.cantidad,
         precioUnitario: item.precioVenta
