@@ -1,4 +1,5 @@
 import { Bell, LogOut, Search, Store } from "lucide-react";
+import Link from "next/link";
 import { logoutAction } from "@/modules/auth/actions/auth.actions";
 import { PushSubscriptionControl } from "@/components/pwa/PushSubscriptionControl";
 
@@ -28,10 +29,10 @@ export function Topbar({ userName }: { userName: string }) {
           <span>Sucursal Central</span>
         </div>
         
-        <button className="text-slate-500 hover:text-slate-900 relative">
+        <Link href="/notificaciones" aria-label="Notificaciones" className="text-slate-500 hover:text-slate-900 relative">
           <Bell size={20} />
           <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-        </button>
+        </Link>
         
         <div title={userName} className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-medium">
           {initials}
