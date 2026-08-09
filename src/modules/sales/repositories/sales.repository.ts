@@ -5,7 +5,7 @@ export async function getSalesPageData() {
   const [branches, categories, customers, products, inventory] = await Promise.all([
     getMainBranch().then((branch) => [branch]),
     prisma.categoria.findMany({ orderBy: { nombre: "asc" } }),
-    prisma.cliente.findMany({ where: { sucursal: { esPrincipal: true } }, orderBy: { nombre: "asc" } }),
+    prisma.cliente.findMany({ where: { activo: true, sucursal: { esPrincipal: true } }, orderBy: { nombre: "asc" } }),
     prisma.producto.findMany({ orderBy: { nombre: "asc" } }),
     prisma.inventario.findMany({
       include: { producto: true, variante: true, sucursal: true },

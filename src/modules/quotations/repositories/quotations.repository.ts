@@ -8,7 +8,7 @@ export async function getQuotationsPageData() {
       include: { categoria: true, variantes: { where: { activa: true }, orderBy: { id: "asc" } } },
       orderBy: { nombre: "asc" },
     }),
-    prisma.cliente.findMany({ where: { sucursal: { esPrincipal: true } }, orderBy: { nombre: "asc" } }),
+    prisma.cliente.findMany({ where: { activo: true, sucursal: { esPrincipal: true } }, orderBy: { nombre: "asc" } }),
     prisma.categoria.findMany({ orderBy: { nombre: "asc" } }),
     prisma.presupuesto.findMany({
       where: { sucursal: { esPrincipal: true } },
