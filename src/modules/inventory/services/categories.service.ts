@@ -1,56 +1,22 @@
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/modules/auth/services/access.service";
-import { PERMISSIONS } from "@/modules/auth/domain/permissions";
+import { createClassification, removeClassification } from "@/modules/inventory/services/classifications.service";
 
 export async function createCategoria(nombre: string) {
-  await requirePermission(PERMISSIONS.PRODUCTS_MANAGE);
-  const normalizedNombre = nombre.trim();
-  if (!normalizedNombre) {
-    return { error: "El nombre de la categoría es requerido." };
-  }
-
   try {
-    const existe = await prisma.categoria.findUnique({
-      where: { nombre: normalizedNombre },
-    });
-
-    if (existe) {
-      return { error: "La categoría ya existe." };
-    }
-
-    const nueva = await prisma.categoria.create({
-      data: {
-        nombre: normalizedNombre,
-      },
-    });
-
-    revalidatePath("/inventario");
-    return { success: true, category: nueva };
-  } catch (error: any) {
-    return { error: error.message || "Error al crear la categoría." };
+    const fallbackFamily = await prisma.familia.findUnique({ where: { nombre: "Otros" } });
+    await createClassification("CATEGORIA", nombre, fallbackFamily?.id);
+    const category = await prisma.categoria.findUniqueOrThrow({ where: { nombre: nombre.trim() } });
+    return { success: true, category };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Error al crear la categoría." };
   }
 }
 
 export async function deleteCategoria(id: number) {
-  await requirePermission(PERMISSIONS.PRODUCTS_MANAGE);
   try {
-    // Verificar si tiene productos asociados
-    const productosCount = await prisma.producto.count({
-      where: { categoriaId: id },
-    });
-
-    if (productosCount > 0) {
-      return { error: "No se puede eliminar la categoría porque tiene productos asociados." };
-    }
-
-    await prisma.categoria.delete({
-      where: { id },
-    });
-
-    revalidatePath("/inventario");
-    return { success: true };
-  } catch (error: any) {
-    return { error: error.message || "Error al eliminar la categoría." };
+    const result = await removeClassification("CATEGORIA", id);
+    return { success: true, message: result.policy === "DEACTIVATE" ? "Categoría desactivada porque está en uso." : "Categoría eliminada." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Error al eliminar la categoría." };
   }
 }

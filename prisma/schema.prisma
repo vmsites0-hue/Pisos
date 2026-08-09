@@ -159,6 +159,24 @@ model Sucursal {
 model Categoria {
   id          Int        @id @default(autoincrement())
   nombre      String     @unique
+  activa      Boolean    @default(true)
+  familiaId   Int?
+  familia     Familia?   @relation(fields: [familiaId], references: [id])
+  productos   Producto[]
+}
+
+model Familia {
+  id          Int         @id @default(autoincrement())
+  nombre      String      @unique
+  activa      Boolean     @default(true)
+  categorias  Categoria[]
+  productos   Producto[]
+}
+
+model Marca {
+  id          Int        @id @default(autoincrement())
+  nombre      String     @unique
+  activa      Boolean    @default(true)
   productos   Producto[]
 }
 
@@ -169,6 +187,8 @@ model Producto {
   nombre            String
   descripcion       String?
   marca             String?
+  familiaId         Int?
+  marcaId           Int?
   categoriaId       Int
   unidadVenta       String               @default("UNIDAD")
   imagenUrl         String?
@@ -185,6 +205,8 @@ model Producto {
   actualizado       DateTime             @updatedAt
 
   categoria         Categoria            @relation(fields: [categoriaId], references: [id])
+  familia           Familia?              @relation(fields: [familiaId], references: [id])
+  marcaCatalogo     Marca?                @relation(fields: [marcaId], references: [id])
   inventarios       Inventario[]
   detallesVenta     DetalleVenta[]
   detallesPresupuesto DetallePresupuesto[]

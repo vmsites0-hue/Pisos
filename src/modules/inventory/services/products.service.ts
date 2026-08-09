@@ -3,6 +3,14 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 
+async function resolveClassifications(categoriaId: number, marca: string | null) {
+  const category = await prisma.categoria.findUniqueOrThrow({ where: { id: categoriaId } });
+  const brand = marca
+    ? await prisma.marca.upsert({ where: { nombre: marca }, update: {}, create: { nombre: marca } })
+    : null;
+  return { familiaId: category.familiaId, marcaId: brand?.id ?? null };
+}
+
 export async function createProducto(formData: FormData) {
   await requirePermission(PERMISSIONS.PRODUCTS_MANAGE);
   try {
@@ -45,6 +53,7 @@ export async function createProducto(formData: FormData) {
       }
     }
 
+    const classifications = await resolveClassifications(categoriaId, marca);
     await prisma.producto.create({
       data: {
         codigo,
@@ -53,6 +62,7 @@ export async function createProducto(formData: FormData) {
         descripcion,
         marca,
         categoriaId,
+        ...classifications,
         unidadVenta,
         m2PorCaja,
         permiteFraccion: permitsFraccion,
@@ -112,6 +122,7 @@ export async function updateProducto(id: number, formData: FormData) {
       }
     }
 
+    const classifications = await resolveClassifications(categoriaId, marca);
     await prisma.producto.update({
       where: { id },
       data: {
@@ -121,6 +132,7 @@ export async function updateProducto(id: number, formData: FormData) {
         descripcion,
         marca,
         categoriaId,
+        ...classifications,
         unidadVenta,
         m2PorCaja,
         permiteFraccion: permitsFraccion,
