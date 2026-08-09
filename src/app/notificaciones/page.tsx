@@ -1,0 +1,8 @@
+import Link from "next/link";
+import { listMyNotifications } from "@/modules/notifications/services/notifications.service";
+import { markAllAsRead, markAsRead } from "@/modules/notifications/actions/notifications.actions";
+
+export default async function NotificationsPage() {
+  const notifications = await listMyNotifications();
+  return <section className="space-y-4"><div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Notificaciones</h1><p className="text-sm text-slate-500">Avisos personales leídos y pendientes.</p></div><form action={markAllAsRead}><button className="rounded border px-3 py-2 text-xs">Marcar todas como leídas</button></form></div><div className="space-y-2">{notifications.length === 0 && <p className="rounded border bg-white p-8 text-center text-slate-500">No tenés avisos.</p>}{notifications.map((notification) => <article key={notification.id} className={`rounded-xl border p-4 ${notification.leidaEn ? "bg-white" : "border-blue-200 bg-blue-50"}`}><div className="flex justify-between gap-4"><div><span className="text-[10px] font-bold uppercase text-slate-500">{notification.tipo}</span><h2 className="font-bold">{notification.titulo}</h2><p className="text-sm text-slate-600">{notification.mensaje}</p><time className="text-[10px] text-slate-400">{notification.creadaEn.toLocaleString("es-PY")}</time></div><div className="flex items-start gap-2">{notification.enlace && <Link href={notification.enlace} className="rounded bg-slate-900 px-2 py-1 text-xs text-white">Abrir</Link>}{!notification.leidaEn && <form action={markAsRead.bind(null, notification.id)}><button className="rounded border bg-white px-2 py-1 text-xs">Leída</button></form>}</div></div></article>)}</div></section>;
+}
