@@ -225,6 +225,11 @@ export function StockForm({ isOpen, onClose, products, sucursales, preselectedPr
             </div>
           </div>
 
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div><label className="mb-1 block text-sm font-medium text-slate-700">Motivo *</label><input required name="motivo" placeholder="Compra, conteo físico, rotura…" className="w-full rounded-md border p-2 text-sm" /></div>
+            <div><label className="mb-1 block text-sm font-medium text-slate-700">ID de aprobación (si reduce stock)</label><input name="approvalId" type="number" min="1" className="w-full rounded-md border p-2 text-sm" /></div>
+          </div>
+
           {/* Cantidades con conversión interactiva */}
           <div className="bg-slate-50 p-4 rounded-xl border space-y-4">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">

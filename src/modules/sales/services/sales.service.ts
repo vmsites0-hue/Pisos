@@ -6,6 +6,8 @@ import { recordAudit } from "@/modules/audit/services/audit.service";
 import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 import { getSystemParameterSnapshot } from "@/modules/settings/services/system-parameters.service";
 import { calculateProductQuantity } from "@/modules/inventory/domain/quantity-conversion";
+import { recordInventoryMovement } from "@/modules/inventory/services/inventory-movements.service";
+import { randomUUID } from "node:crypto";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -28,6 +30,7 @@ export async function procesarVenta(input: VentaInput) {
   const authenticatedUser = await requirePermission(PERMISSIONS.SALES_CREATE);
   const mainBranch = await getMainBranch();
   const configurationSnapshot = await getSystemParameterSnapshot();
+  const operationReference = randomUUID();
 
   try {
     const { clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles } = input;
@@ -92,6 +95,7 @@ export async function procesarVenta(input: VentaInput) {
             },
           },
         });
+        await recordInventoryMovement(tx, { inventoryId: inv!.id, variantId: variant.id, userId: usuarioId, type: "VENTA", quantity: -conversion.actualQuantity, baseUnit: variant.unidadBase?.codigo ?? producto.unidadVenta, previousBalance: stockActual, resultingBalance: stockActual - conversion.actualQuantity, reason: `Venta confirmada para cliente ${clienteId}`, referenceType: "VENTA", referenceId: operationReference });
 
         const itemSubtotal = conversion.actualQuantity * item.precioUnitario;
         subtotal += itemSubtotal;
@@ -167,6 +171,7 @@ export async function procesarVenta(input: VentaInput) {
           sucursal: true,
         },
       });
+      await tx.movimientoInventario.updateMany({ where: { referenciaTipo: "VENTA", referenciaId: operationReference, usuarioId }, data: { referenciaId: venta.id.toString() } });
 
       await recordAudit({
         userId: usuarioId,

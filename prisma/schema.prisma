@@ -27,6 +27,7 @@ model Usuario {
   aprobacionesSolicitadas SolicitudAprobacion[] @relation("SolicitanteAprobacion")
   aprobacionesResueltas   SolicitudAprobacion[] @relation("AprobadorAprobacion")
   auditorias              RegistroAuditoria[]
+  movimientosInventario  MovimientoInventario[]
 }
 
 model Rol {
@@ -269,6 +270,7 @@ model VarianteProducto {
   inventarios Inventario[]
   detallesVenta DetalleVenta[]
   detallesPresupuesto DetallePresupuesto[]
+  movimientosInventario MovimientoInventario[]
 
   @@index([productoId])
 }
@@ -338,9 +340,33 @@ model Inventario {
   producto        Producto  @relation(fields: [productoId], references: [id])
   variante        VarianteProducto? @relation(fields: [varianteId], references: [id])
   sucursal        Sucursal  @relation(fields: [sucursalId], references: [id])
+  movimientos     MovimientoInventario[]
 
   @@unique([productoId, sucursalId, loteTono])
   @@index([varianteId, sucursalId, lote, tono, calibre])
+}
+
+model MovimientoInventario {
+  id              Int      @id @default(autoincrement())
+  inventarioId    Int
+  varianteId      Int?
+  usuarioId       Int
+  tipo            String
+  cantidad        Float
+  unidadBase      String
+  saldoAnterior   Float
+  saldoResultante Float
+  motivo          String
+  referenciaTipo  String?
+  referenciaId    String?
+  creadoEn        DateTime @default(now())
+
+  inventario Inventario @relation(fields: [inventarioId], references: [id])
+  variante VarianteProducto? @relation(fields: [varianteId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([inventarioId, creadoEn])
+  @@index([varianteId, creadoEn])
 }
 
 // ==========================================
