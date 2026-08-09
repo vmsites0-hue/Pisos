@@ -6,7 +6,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
   await requireAuthenticatedUser();
   const query = await searchParams;
   const filters = { from: query.from, to: query.to, userId: query.userId ? Number(query.userId) : undefined, paymentMethod: query.paymentMethod };
-  const { sales, debtorCustomers, expenses, credits, movements, users } = await getFinancePageData(filters);
+  const { sales, debtorCustomers, expenses, credits, movements, closures, users } = await getFinancePageData(filters);
 
   return (
     <FinanzasClient
@@ -17,6 +17,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
       movements={movements}
       users={users}
       filters={filters}
+      closures={closures}
     />
   );
 }
