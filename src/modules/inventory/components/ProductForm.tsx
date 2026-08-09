@@ -9,7 +9,7 @@ interface ProductFormProps {
   isOpen: boolean;
   onClose: () => void;
   product?: any; // Si existe, es edición. Si no, creación.
-  categories: { id: number; nombre: string }[];
+  categories: { id: number; nombre: string; familia?: { atributos: { id: number; nombre: string; tipo: string; obligatorio: boolean; opciones: string | null }[] } | null }[];
 }
 
 export function ProductForm({ isOpen, onClose, product, categories }: ProductFormProps) {
@@ -85,6 +85,8 @@ export function ProductForm({ isOpen, onClose, product, categories }: ProductFor
   }
 
   const isM2OrCaja = unidadVenta === "M2" || unidadVenta === "CAJA";
+  const selectedAttributes = categories.find((category) => category.id.toString() === selectedCategory)?.familia?.atributos ?? [];
+  const currentValues = new Map<number, string>((product?.variantes?.[0]?.valores ?? []).map((item: any) => [item.atributoId, item.valor]));
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -105,6 +107,35 @@ export function ProductForm({ isOpen, onClose, product, categories }: ProductFor
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {selectedAttributes.length > 0 && (
+            <fieldset className="rounded-lg border p-4">
+              <legend className="px-2 text-sm font-semibold text-slate-700">Características de la variante</legend>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                {selectedAttributes.map((attribute) => {
+                  const name = `atributo_${attribute.id}`;
+                  const defaultValue = currentValues.get(attribute.id) ?? "";
+                  const options: string[] = attribute.opciones ? JSON.parse(attribute.opciones) : [];
+                  return (
+                    <label key={attribute.id} className="block text-sm font-medium text-slate-700">
+                      {attribute.nombre}{attribute.obligatorio ? " *" : ""}
+                      {attribute.tipo === "SELECCION" ? (
+                        <select name={name} required={attribute.obligatorio} defaultValue={defaultValue} className="mt-1 w-full rounded-md border bg-white p-2 text-sm">
+                          <option value="">Seleccionar...</option>
+                          {options.map((option) => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                      ) : attribute.tipo === "BOOLEANO" ? (
+                        <select name={name} required={attribute.obligatorio} defaultValue={defaultValue} className="mt-1 w-full rounded-md border bg-white p-2 text-sm">
+                          <option value="">Seleccionar...</option><option value="true">Sí</option><option value="false">No</option>
+                        </select>
+                      ) : (
+                        <input name={name} required={attribute.obligatorio} type={attribute.tipo === "NUMERO" ? "number" : "text"} step={attribute.tipo === "NUMERO" ? "any" : undefined} defaultValue={defaultValue} className="mt-1 w-full rounded-md border p-2 text-sm" />
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Código */}
             <div>

@@ -187,6 +187,7 @@ model AtributoFamilia {
   activo      Boolean  @default(true)
 
   familia Familia @relation(fields: [familiaId], references: [id], onDelete: Cascade)
+  valores VarianteAtributoValor[]
 
   @@unique([familiaId, clave])
 }
@@ -228,6 +229,38 @@ model Producto {
   inventarios       Inventario[]
   detallesVenta     DetalleVenta[]
   detallesPresupuesto DetallePresupuesto[]
+  variantes         VarianteProducto[]
+}
+
+model VarianteProducto {
+  id             Int      @id @default(autoincrement())
+  productoId     Int
+  sku            String   @unique
+  codigoBarras   String?  @unique
+  nombre          String?
+  precioCompra   Float
+  precioVenta    Float
+  activa          Boolean  @default(true)
+  creadoEn        DateTime @default(now())
+  actualizado     DateTime @updatedAt
+
+  producto Producto                @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  valores  VarianteAtributoValor[]
+
+  @@index([productoId])
+}
+
+model VarianteAtributoValor {
+  id          Int @id @default(autoincrement())
+  varianteId  Int
+  atributoId  Int
+  valor       String
+
+  variante VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
+  atributo AtributoFamilia   @relation(fields: [atributoId], references: [id], onDelete: Restrict)
+
+  @@unique([varianteId, atributoId])
+  @@index([atributoId])
 }
 
 // ==========================================

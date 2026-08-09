@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
+import { readVariantValues, validateVariantValues } from "@/modules/inventory/domain/product-variant";
 
 async function resolveClassifications(categoriaId: number, marca: string | null) {
   const category = await prisma.categoria.findUniqueOrThrow({ where: { id: categoriaId } });
@@ -9,6 +10,15 @@ async function resolveClassifications(categoriaId: number, marca: string | null)
     ? await prisma.marca.upsert({ where: { nombre: marca }, update: {}, create: { nombre: marca } })
     : null;
   return { familiaId: category.familiaId, marcaId: brand?.id ?? null };
+}
+
+async function resolveVariantValues(categoriaId: number, formData: FormData) {
+  const category = await prisma.categoria.findUnique({ where: { id: categoriaId }, include: { familia: { include: { atributos: { where: { activo: true } } } } } });
+  const definitions = category?.familia?.atributos ?? [];
+  const values = readVariantValues(formData);
+  const errors = validateVariantValues(definitions, values);
+  if (errors.length) throw new Error(errors.join(" "));
+  return [...values].filter(([id]) => definitions.some((item) => item.id === id)).map(([atributoId, valor]) => ({ atributoId, valor }));
 }
 
 export async function createProducto(formData: FormData) {
@@ -54,6 +64,7 @@ export async function createProducto(formData: FormData) {
     }
 
     const classifications = await resolveClassifications(categoriaId, marca);
+    const variantValues = await resolveVariantValues(categoriaId, formData);
     await prisma.producto.create({
       data: {
         codigo,
@@ -70,6 +81,7 @@ export async function createProducto(formData: FormData) {
         precioVenta,
         stockMinimo,
         imagenUrl,
+        variantes: { create: { sku: codigo, codigoBarras, precioCompra, precioVenta, valores: { create: variantValues } } },
       },
     });
 
@@ -123,9 +135,10 @@ export async function updateProducto(id: number, formData: FormData) {
     }
 
     const classifications = await resolveClassifications(categoriaId, marca);
-    await prisma.producto.update({
-      where: { id },
-      data: {
+    const variantValues = await resolveVariantValues(categoriaId, formData);
+    const primaryVariant = await prisma.varianteProducto.findFirst({ where: { productoId: id }, orderBy: { id: "asc" } });
+    await prisma.$transaction(async (tx) => {
+      await tx.producto.update({ where: { id }, data: {
         codigo,
         codigoBarras,
         nombre,
@@ -140,7 +153,17 @@ export async function updateProducto(id: number, formData: FormData) {
         precioVenta,
         stockMinimo,
         imagenUrl,
-      },
+      } });
+      if (primaryVariant) {
+        await tx.varianteProducto.update({
+          where: { id: primaryVariant.id },
+          data: { sku: codigo, codigoBarras, precioCompra, precioVenta, valores: { deleteMany: {}, create: variantValues } },
+        });
+      } else {
+        await tx.varianteProducto.create({
+          data: { productoId: id, sku: codigo, codigoBarras, precioCompra, precioVenta, valores: { create: variantValues } },
+        });
+      }
     });
 
     revalidatePath("/inventario");
