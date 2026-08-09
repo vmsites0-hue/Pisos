@@ -12,7 +12,7 @@ interface ConfiguracionClientProps {
 }
 
 export function ConfiguracionClient({ sucursales, reglas, categories }: ConfiguracionClientProps) {
-  const [activeTab, setActiveTab] = useState<"sucursales" | "descuentos">("sucursales");
+  const [activeTab, setActiveTab] = useState<"sucursales" | "descuentos">("descuentos");
 
   // Edit sucursal
   const [editingSucursal, setEditingSucursal] = useState<any | null>(null);
@@ -99,16 +99,6 @@ export function ConfiguracionClient({ sucursales, reglas, categories }: Configur
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200">
-        <button
-          onClick={() => setActiveTab("sucursales")}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
-            activeTab === "sucursales"
-              ? "border-slate-900 text-slate-900"
-              : "border-transparent text-slate-500 hover:text-slate-900"
-          }`}
-        >
-          Sucursales
-        </button>
         <button
           onClick={() => setActiveTab("descuentos")}
           className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${

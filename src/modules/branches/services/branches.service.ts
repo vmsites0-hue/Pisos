@@ -5,23 +5,8 @@ import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 
 export async function createSucursal(formData: FormData) {
   await requirePermission(PERMISSIONS.BRANCHES_MANAGE);
-  const nombre = formData.get("nombre") as string;
-  const direccion = formData.get("direccion") as string;
-  const telefono = formData.get("telefono") as string;
-
-  if (!nombre) return { error: "El nombre es requerido" };
-
-  await prisma.sucursal.create({
-    data: {
-      nombre,
-      direccion,
-      telefono,
-      activa: true,
-    },
-  });
-
-  revalidatePath("/configuracion");
-  return { success: true };
+  void formData;
+  return { error: "El MVP opera con un único local principal y no permite crear otro." };
 }
 
 export async function updateSucursal(id: number, formData: FormData) {
@@ -47,6 +32,8 @@ export async function updateSucursal(id: number, formData: FormData) {
 export async function deleteSucursal(id: number) {
   await requirePermission(PERMISSIONS.BRANCHES_MANAGE);
   try {
+    const target = await prisma.sucursal.findUniqueOrThrow({ where: { id } });
+    if (target.esPrincipal) return { error: "El local principal no puede eliminarse." };
     // Verificar que no tenga inventario asociado
     const invCount = await prisma.inventario.count({ where: { sucursalId: id } });
     if (invCount > 0) {
@@ -75,6 +62,8 @@ export async function deleteSucursal(id: number) {
 export async function toggleSucursal(id: number, activa: boolean) {
   await requirePermission(PERMISSIONS.BRANCHES_MANAGE);
   try {
+    const target = await prisma.sucursal.findUniqueOrThrow({ where: { id } });
+    if (target.esPrincipal && !activa) return { error: "El local principal no puede desactivarse." };
     await prisma.sucursal.update({
       where: { id },
       data: { activa },

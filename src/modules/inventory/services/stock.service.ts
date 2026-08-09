@@ -3,17 +3,19 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { recordAudit } from "@/modules/audit/services/audit.service";
+import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 
 export async function ajustarStock(formData: FormData) {
   const user = await requirePermission(PERMISSIONS.INVENTORY_ADJUST);
+  const mainBranch = await getMainBranch();
   try {
     const productoId = parseInt(formData.get("productoId") as string);
-    const sucursalId = parseInt(formData.get("sucursalId") as string);
+    const sucursalId = mainBranch.id;
     const loteTono = (formData.get("loteTono") as string)?.trim() || null;
     const cantidad = parseFloat(formData.get("cantidad") as string);
     const tipoAjuste = formData.get("tipoAjuste") as string; // "SUMAR", "RESTAR", "FIJAR"
 
-    if (isNaN(productoId) || isNaN(sucursalId) || isNaN(cantidad)) {
+    if (isNaN(productoId) || isNaN(cantidad)) {
       return { error: "Faltan datos obligatorios o son inválidos." };
     }
 

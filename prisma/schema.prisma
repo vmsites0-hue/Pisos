@@ -15,12 +15,12 @@ model Usuario {
   nombre      String
   email       String    @unique
   password    String    // Hashed
-  sucursalId  Int?
+  sucursalId  Int
   activo      Boolean   @default(true)
   creadoEn    DateTime  @default(now())
   actualizado DateTime  @updatedAt
 
-  sucursal    Sucursal? @relation(fields: [sucursalId], references: [id])
+  sucursal    Sucursal  @relation(fields: [sucursalId], references: [id])
   ventas      Venta[]
   sesiones    Sesion[]
   roles       UsuarioRol[]
@@ -130,11 +130,16 @@ model Sucursal {
   direccion   String?
   telefono    String?
   activa      Boolean   @default(true)
+  esPrincipal Boolean   @default(false)
   creadoEn    DateTime  @default(now())
 
   usuarios    Usuario[]
   inventarios Inventario[]
   ventas      Venta[]
+  clientes    Cliente[]
+  presupuestos Presupuesto[]
+  gastos      Gasto[]
+  reglasDescuento ReglaDescuento[]
 }
 
 // ==========================================
@@ -201,6 +206,7 @@ model Inventario {
 
 model Cliente {
   id             Int           @id @default(autoincrement())
+  sucursalId     Int
   nombre         String
   apellido       String
   documento      String        @unique // CI o DNI
@@ -217,6 +223,9 @@ model Cliente {
 
   ventas         Venta[]
   presupuestos   Presupuesto[]
+  sucursal       Sucursal      @relation(fields: [sucursalId], references: [id])
+
+  @@index([sucursalId])
 }
 
 // ==========================================
@@ -265,6 +274,7 @@ model DetalleVenta {
 
 model Presupuesto {
   id             Int                  @id @default(autoincrement())
+  sucursalId     Int
   clienteId      Int
   fecha          DateTime             @default(now())
   subtotal       Float
@@ -273,7 +283,10 @@ model Presupuesto {
   validezDias    Int                  @default(15)
   
   cliente        Cliente              @relation(fields: [clienteId], references: [id])
+  sucursal       Sucursal             @relation(fields: [sucursalId], references: [id])
   detalles       DetallePresupuesto[]
+
+  @@index([sucursalId])
 }
 
 model DetallePresupuesto {
@@ -295,10 +308,14 @@ model DetallePresupuesto {
 
 model Gasto {
   id          Int      @id @default(autoincrement())
+  sucursalId  Int
   descripcion String
   monto       Float
   categoria   String?
   fecha       DateTime @default(now())
+  sucursal    Sucursal @relation(fields: [sucursalId], references: [id])
+
+  @@index([sucursalId])
 }
 
 // ==========================================
@@ -307,6 +324,7 @@ model Gasto {
 
 model ReglaDescuento {
   id                 Int      @id @default(autoincrement())
+  sucursalId         Int
   nombre             String
   tipo               String   // POR_VOLUMEN, POR_CATEGORIA, POR_MONTO
   categoriaId        Int?     // Si aplica solo a una categoría
@@ -314,4 +332,7 @@ model ReglaDescuento {
   porcentajeDescuento Float   // Ej: 5 (= 5%)
   activa             Boolean  @default(true)
   creadoEn           DateTime @default(now())
+  sucursal            Sucursal @relation(fields: [sucursalId], references: [id])
+
+  @@index([sucursalId])
 }

@@ -356,15 +356,9 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
               <Store className="text-slate-500" size={20} />
               <span>Sucursal Origen</span>
             </h3>
-            <select
-              value={sucursalId}
-              onChange={(e) => setSucursalId(parseInt(e.target.value))}
-              className="border rounded-md px-3 py-1.5 text-sm bg-white outline-none focus:border-slate-400 font-semibold text-slate-700"
-            >
-              {sucursales.map(s => (
-                <option key={s.id} value={s.id}>{s.nombre}</option>
-              ))}
-            </select>
+            <span className="rounded-md border bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-700">
+              {selectedSucursal?.nombre ?? "Local principal"}
+            </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

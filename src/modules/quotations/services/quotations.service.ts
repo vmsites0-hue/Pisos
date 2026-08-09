@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
+import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 
 export interface DetallePresupuestoInput {
   productoId: number;
@@ -17,6 +18,7 @@ export interface PresupuestoInput {
 
 export async function crearPresupuesto(input: PresupuestoInput) {
   await requirePermission(PERMISSIONS.QUOTATIONS_MANAGE);
+  const mainBranch = await getMainBranch();
   try {
     const { clienteId, descuento, detalles } = input;
 
@@ -63,6 +65,7 @@ export async function crearPresupuesto(input: PresupuestoInput) {
     // 3. Crear el Presupuesto y Detalles
     const presupuesto = await prisma.presupuesto.create({
       data: {
+        sucursalId: mainBranch.id,
         clienteId,
         subtotal,
         descuento,

@@ -3,9 +3,11 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { recordAudit } from "@/modules/audit/services/audit.service";
+import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 
 export async function registrarGasto(formData: FormData) {
   const user = await requirePermission(PERMISSIONS.EXPENSES_CREATE);
+  const mainBranch = await getMainBranch();
   try {
     const descripcion = (formData.get("descripcion") as string)?.trim();
     const monto = parseFloat(formData.get("monto") as string);
@@ -17,6 +19,7 @@ export async function registrarGasto(formData: FormData) {
 
     const expense = await prisma.gasto.create({
       data: {
+        sucursalId: mainBranch.id,
         descripcion,
         monto,
         categoria,

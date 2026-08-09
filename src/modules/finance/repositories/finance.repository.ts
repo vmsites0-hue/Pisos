@@ -6,15 +6,15 @@ export async function getFinancePageData(now = new Date()) {
 
   const [sales, debtorCustomers, expenses] = await Promise.all([
     prisma.venta.findMany({
-      where: { fecha: { gte: todayStart } },
+      where: { fecha: { gte: todayStart }, sucursal: { esPrincipal: true } },
       orderBy: { fecha: "desc" },
     }),
     prisma.cliente.findMany({
-      where: { saldoDeudor: { gt: 0 } },
+      where: { saldoDeudor: { gt: 0 }, sucursal: { esPrincipal: true } },
       orderBy: { saldoDeudor: "desc" },
     }),
     prisma.gasto.findMany({
-      where: { fecha: { gte: todayStart } },
+      where: { fecha: { gte: todayStart }, sucursal: { esPrincipal: true } },
       orderBy: { fecha: "desc" },
     }),
   ]);

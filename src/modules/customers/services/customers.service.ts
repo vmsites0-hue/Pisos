@@ -2,9 +2,11 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
+import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 
 export async function createCliente(formData: FormData) {
   await requirePermission(PERMISSIONS.CUSTOMERS_MANAGE);
+  const mainBranch = await getMainBranch();
   try {
     const nombre = (formData.get("nombre") as string)?.trim();
     const apellido = (formData.get("apellido") as string)?.trim();
@@ -41,6 +43,7 @@ export async function createCliente(formData: FormData) {
 
     const nuevoCliente = await prisma.cliente.create({
       data: {
+        sucursalId: mainBranch.id,
         nombre,
         apellido,
         documento,
