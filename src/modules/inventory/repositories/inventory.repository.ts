@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 
 export async function getInventoryPageData() {
-  const [products, categories, families, brands, units, branches, inventory] = await Promise.all([
+  const [products, categories, families, brands, units, branches, inventory, movements] = await Promise.all([
     prisma.producto.findMany({
       include: { categoria: true, familia: true, marcaCatalogo: true, imagenes: { orderBy: { orden: "asc" } }, variantes: { include: { unidadBase: true, presentaciones: { include: { unidad: true } }, valores: { include: { atributo: true } } } } },
       orderBy: { creadoEn: "desc" },
@@ -17,7 +17,8 @@ export async function getInventoryPageData() {
       include: { producto: true, sucursal: true, variante: { include: { unidadBase: true, valores: { include: { atributo: true } }, presentaciones: { where: { activa: true }, include: { unidad: true } } } } },
       orderBy: { producto: { codigo: "asc" } },
     }),
+    prisma.movimientoInventario.findMany({ include: { usuario: { select: { nombre: true } }, variante: { include: { producto: true } } }, orderBy: { creadoEn: "desc" }, take: 200 }),
   ]);
 
-  return { products, categories, families, brands, units, branches, inventory };
+  return { products, categories, families, brands, units, branches, inventory, movements };
 }

@@ -27,10 +27,11 @@ interface InventarioClientProps {
   units: any[];
   sucursales: any[];
   inventarios: any[];
+  movements: any[];
 }
 
-export function InventarioClient({ products, categories, families, brands, units, sucursales, inventarios }: InventarioClientProps) {
-  const [activeTab, setActiveTab] = useState<"catalogo" | "stock">("catalogo");
+export function InventarioClient({ products, categories, families, brands, units, sucursales, inventarios, movements }: InventarioClientProps) {
+  const [activeTab, setActiveTab] = useState<"catalogo" | "stock" | "movimientos">("catalogo");
   
   // Filtros y búsquedas
   const [searchQuery, setSearchQuery] = useState("");
@@ -170,6 +171,7 @@ export function InventarioClient({ products, categories, families, brands, units
         >
           Stock por Sucursal / Lote
         </button>
+        <button onClick={() => { setActiveTab("movimientos"); setSearchQuery(""); }} className={`px-4 py-2 text-sm font-semibold border-b-2 ${activeTab === "movimientos" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500"}`}>Movimientos ({movements.length})</button>
       </div>
 
       {/* Buscador y Filtros */}
@@ -438,6 +440,8 @@ export function InventarioClient({ products, categories, families, brands, units
           </table>
         </div>
       )}
+
+      {activeTab === "movimientos" && <div className="overflow-hidden rounded-xl border bg-white"><table className="w-full text-left text-sm"><thead className="border-b bg-slate-50"><tr><th className="px-4 py-3">Fecha</th><th className="px-4 py-3">Variante</th><th className="px-4 py-3">Tipo</th><th className="px-4 py-3 text-right">Cantidad</th><th className="px-4 py-3 text-right">Saldo</th><th className="px-4 py-3">Usuario / Motivo</th><th className="px-4 py-3">Referencia</th></tr></thead><tbody className="divide-y">{movements.map((movement) => <tr key={movement.id}><td className="px-4 py-3">{new Date(movement.creadoEn).toLocaleString("es-PY")}</td><td className="px-4 py-3"><strong>{movement.variante?.sku ?? "Histórico"}</strong><div className="text-xs text-slate-500">{movement.variante?.producto?.nombre}</div></td><td className="px-4 py-3">{movement.tipo}</td><td className={`px-4 py-3 text-right font-semibold ${movement.cantidad < 0 ? "text-red-600" : "text-emerald-700"}`}>{movement.cantidad} {movement.unidadBase}</td><td className="px-4 py-3 text-right">{movement.saldoAnterior} → {movement.saldoResultante}</td><td className="px-4 py-3">{movement.usuario.nombre}<div className="text-xs text-slate-500">{movement.motivo}</div></td><td className="px-4 py-3">{movement.referenciaTipo ?? "—"} {movement.referenciaId ?? ""}</td></tr>)}</tbody></table></div>}
 
       {/* Modal de Producto */}
       <ProductForm 
