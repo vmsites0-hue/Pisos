@@ -21,6 +21,8 @@ import {
 import { procesarVenta } from "@/modules/sales/actions/sales.actions";
 import { calcularDescuentoAutomatico } from "@/modules/discounts/actions/discounts.actions";
 import { availableStock, matchesCatalogQuery } from "@/modules/sales/domain/catalog-search";
+import { cancelSaleAction } from "@/modules/returns/actions/sale-cancellations.actions";
+import { registerReturnAction } from "@/modules/returns/actions/returns.actions";
 
 interface VentasClientProps {
   products: any[];
@@ -58,6 +60,8 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
   // Modal de Recibo/Ticket
   const [showReceipt, setShowReceipt] = useState(false);
   const [createdVenta, setCreatedVenta] = useState<any>(null);
+  const [cancellationMessage, setCancellationMessage] = useState<string | null>(null);
+  const [returnMessage, setReturnMessage] = useState<string | null>(null);
 
   // Estado de descarga PDF
   const [downloading, setDownloading] = useState(false);
@@ -848,10 +852,13 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
                 </div>
               </div>
 
+              {createdVenta.estado !== "CANCELADA" && <details className="no-print rounded border p-2 font-sans"><summary className="cursor-pointer text-xs font-semibold">Registrar devolución</summary><form action={async (formData) => { const result = await registerReturnAction(formData); setReturnMessage(result.success ? "Devolución registrada." : `${result.error}${result.approvalRequestId ? ` Solicitud #${result.approvalRequestId}.` : ""}`); }} className="mt-2 grid grid-cols-2 gap-1"><input type="hidden" name="saleId" value={createdVenta.id} /><select required name="saleDetailId" className="rounded border p-1 text-xs">{createdVenta.detalles.map((detail: any) => <option key={detail.id} value={detail.id}>{detail.producto.nombre}</option>)}</select><input required name="quantity" type="number" min="0.001" step="0.001" placeholder="Cantidad" className="rounded border p-1 text-xs" /><select name="condition" className="rounded border p-1 text-xs"><option value="APTO">Apto: vuelve a stock</option><option value="DEFECTUOSO">Defectuoso: pérdida</option><option value="CUARENTENA">Cuarentena</option></select><input required name="reason" placeholder="Motivo" className="rounded border p-1 text-xs" /><input name="evidenceUrl" placeholder="URL evidencia (opcional)" className="rounded border p-1 text-xs" /><input name="approvalId" type="number" min="1" placeholder="ID aprobación" className="rounded border p-1 text-xs" /><button className="col-span-2 rounded bg-slate-900 p-1 text-xs text-white">Solicitar/registrar devolución</button>{returnMessage && <p className="col-span-2 text-xs text-slate-600">{returnMessage}</p>}</form></details>}
+
             </div>
 
             {/* Botones de acción del recibo */}
             <div className="p-4 border-t bg-slate-50 flex flex-col sm:flex-row gap-2 no-print">
+              {createdVenta.estado !== "ENTREGADO" && createdVenta.estado !== "CANCELADA" && <form action={async (formData) => { const result = await cancelSaleAction(formData); if (result.success) { setCreatedVenta({ ...createdVenta, estado: "CANCELADA" }); setCancellationMessage("Venta cancelada y stock revertido."); } else setCancellationMessage(`${result.error}${result.approvalRequestId ? ` Solicitud #${result.approvalRequestId}.` : ""}`); }} className="w-full space-y-1 rounded border bg-white p-2"><input type="hidden" name="saleId" value={createdVenta.id} /><div className="grid grid-cols-2 gap-1"><input required name="reason" placeholder="Motivo de cancelación" className="rounded border p-1 text-xs" /><input name="approvalId" type="number" min="1" placeholder="ID aprobación" className="rounded border p-1 text-xs" /></div><button className="w-full rounded border p-1 text-xs font-semibold text-red-700">Solicitar/ejecutar cancelación</button>{cancellationMessage && <p className="text-xs text-slate-600">{cancellationMessage}</p>}</form>}
               <button
                 type="button"
                 onClick={handleDownloadPDF}
