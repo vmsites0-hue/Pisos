@@ -1,0 +1,10 @@
+import { requireAuthenticatedUser } from "@/modules/auth/services/session.service";
+import { prisma } from "@/lib/prisma";
+import { REPORT_DATASETS } from "@/modules/reports/domain/csv";
+
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  await requireAuthenticatedUser(); const query = await searchParams;
+  const users = await prisma.usuario.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } });
+  const params = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => Boolean(entry[1])));
+  return <section className="space-y-5"><div><h1 className="text-2xl font-bold">Reportes y exportaciones</h1><p className="text-sm text-slate-500">El local principal se aplica internamente.</p></div><form className="grid gap-2 rounded-xl border bg-white p-4 md:grid-cols-5"><input type="date" name="from" defaultValue={query.from} className="rounded border p-2 text-xs"/><input type="date" name="to" defaultValue={query.to} className="rounded border p-2 text-xs"/><select name="userId" defaultValue={query.userId ?? ""} className="rounded border p-2 text-xs"><option value="">Todos los empleados</option>{users.map((user) => <option key={user.id} value={user.id}>{user.nombre}</option>)}</select><select name="paymentMethod" defaultValue={query.paymentMethod ?? ""} className="rounded border p-2 text-xs"><option value="">Todos los métodos</option><option>EFECTIVO</option><option>TARJETA</option><option>TRANSFERENCIA</option><option>CREDITO</option></select><button className="rounded bg-slate-900 p-2 text-xs text-white">Aplicar filtros</button></form><div className="grid gap-3 md:grid-cols-2">{REPORT_DATASETS.map((dataset) => <a key={dataset} href={`/api/reportes/${dataset}?${params}`} className="rounded-xl border bg-white p-4 font-semibold hover:bg-slate-50">Descargar {dataset.replaceAll("-", " ")} (CSV)</a>)}</div><p className="text-xs text-slate-500">Los documentos operativos, como la nota de entrega, se generan en PDF desde su operación correspondiente.</p></section>;
+}
