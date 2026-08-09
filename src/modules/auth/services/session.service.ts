@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/modules/auth/domain/password";
+import { recordAudit } from "@/modules/audit/services/audit.service";
 
 const SESSION_COOKIE = "erpiso_session";
 const SESSION_DURATION_MS = 12 * 60 * 60 * 1000;
@@ -16,6 +17,7 @@ export async function authenticate(email: string, password: string) {
   const user = await prisma.usuario.findUnique({ where: { email: normalizedEmail } });
 
   if (!user || !user.activo || !(await verifyPassword(password, user.password))) {
+    await recordAudit({ action: "LOGIN_RECHAZADO", entity: "Usuario", entityId: normalizedEmail });
     return null;
   }
 
@@ -34,6 +36,8 @@ export async function authenticate(email: string, password: string) {
     expires: expiresAt,
     path: "/",
   });
+
+  await recordAudit({ userId: user.id, action: "LOGIN_EXITOSO", entity: "Usuario", entityId: user.id });
 
   return user;
 }
@@ -65,7 +69,14 @@ export async function closeCurrentSession() {
   const token = cookieStore.get(SESSION_COOKIE)?.value;
 
   if (token) {
+    const session = await prisma.sesion.findUnique({
+      where: { tokenHash: hashToken(token) },
+      select: { usuarioId: true },
+    });
     await prisma.sesion.deleteMany({ where: { tokenHash: hashToken(token) } });
+    if (session) {
+      await recordAudit({ userId: session.usuarioId, action: "LOGOUT", entity: "Usuario", entityId: session.usuarioId });
+    }
   }
 
   cookieStore.delete(SESSION_COOKIE);

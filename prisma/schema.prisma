@@ -26,6 +26,7 @@ model Usuario {
   roles       UsuarioRol[]
   aprobacionesSolicitadas SolicitudAprobacion[] @relation("SolicitanteAprobacion")
   aprobacionesResueltas   SolicitudAprobacion[] @relation("AprobadorAprobacion")
+  auditorias              RegistroAuditoria[]
 }
 
 model Rol {
@@ -100,6 +101,23 @@ model SolicitudAprobacion {
 model PoliticaAprobacion {
   id                       Int     @id @default(1)
   permitirAutoAprobacion   Boolean @default(false)
+}
+
+model RegistroAuditoria {
+  id            Int       @id @default(autoincrement())
+  usuarioId     Int?
+  accion        String
+  entidad       String
+  entidadId     String?
+  datosAntes    String?
+  datosDespues  String?
+  creadoEn      DateTime  @default(now())
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([entidad, entidadId])
+  @@index([usuarioId, creadoEn])
+  @@index([creadoEn])
 }
 
 // ==========================================

@@ -14,6 +14,7 @@ export const PERMISSIONS = {
   PAYMENTS_CREATE: "payments.create",
   APPROVALS_REVIEW: "approvals.review",
   APPROVALS_POLICY_MANAGE: "approvals.policy.manage",
+  AUDIT_VIEW: "audit.view",
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

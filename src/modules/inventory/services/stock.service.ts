@@ -2,9 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
+import { recordAudit } from "@/modules/audit/services/audit.service";
 
 export async function ajustarStock(formData: FormData) {
-  await requirePermission(PERMISSIONS.INVENTORY_ADJUST);
+  const user = await requirePermission(PERMISSIONS.INVENTORY_ADJUST);
   try {
     const productoId = parseInt(formData.get("productoId") as string);
     const sucursalId = parseInt(formData.get("sucursalId") as string);
@@ -63,6 +64,15 @@ export async function ajustarStock(formData: FormData) {
         },
       });
     }
+
+    await recordAudit({
+      userId: user.id,
+      action: "INVENTARIO_AJUSTADO",
+      entity: "Inventario",
+      entityId: inventarioExistente?.id,
+      before: inventarioExistente,
+      after: { productoId, sucursalId, loteTono, stockActual: nuevoStock, tipoAjuste },
+    });
 
     revalidatePath("/inventario");
     return { success: true };

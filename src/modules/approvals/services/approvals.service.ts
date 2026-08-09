@@ -5,6 +5,7 @@ import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { requireAuthenticatedUser } from "@/modules/auth/services/session.service";
 import { isApprovalType, type ApprovalType } from "@/modules/approvals/domain/approval-types";
+import { recordAudit } from "@/modules/audit/services/audit.service";
 
 export async function requestApproval(input: {
   type: string;
@@ -28,6 +29,7 @@ export async function requestApproval(input: {
       solicitanteId: user.id,
     },
   });
+  await recordAudit({ userId: user.id, action: "SOLICITUD_CREADA", entity: "SolicitudAprobacion", entityId: request.id, after: request });
   revalidatePath("/aprobaciones");
   return request;
 }
@@ -49,6 +51,7 @@ export async function approveRequest(id: number) {
     data: { estado: "APROBADA", aprobadorId: approver.id, resueltoEn: new Date() },
   });
   if (result.count !== 1) throw new Error("La solicitud fue resuelta por otro usuario.");
+  await recordAudit({ userId: approver.id, action: "SOLICITUD_APROBADA", entity: "SolicitudAprobacion", entityId: id, before: request, after: { estado: "APROBADA" } });
   revalidatePath("/aprobaciones");
 }
 
@@ -59,6 +62,7 @@ export async function rejectRequest(id: number) {
     data: { estado: "RECHAZADA", aprobadorId: approver.id, resueltoEn: new Date() },
   });
   if (result.count !== 1) throw new Error("La solicitud ya fue resuelta.");
+  await recordAudit({ userId: approver.id, action: "SOLICITUD_RECHAZADA", entity: "SolicitudAprobacion", entityId: id, after: { estado: "RECHAZADA" } });
   revalidatePath("/aprobaciones");
 }
 
@@ -97,6 +101,8 @@ export async function consumeApproval<T>(
     if (reserved.count !== 1) throw new Error("La autorización ya fue utilizada.");
 
     const values = JSON.parse(request.valoresPropuestos) as unknown;
-    return operation(tx, values);
+    const result = await operation(tx, values);
+    await recordAudit({ userId: user.id, action: "AUTORIZACION_CONSUMIDA", entity: "SolicitudAprobacion", entityId: id, after: { estado: "EJECUTADA" } }, tx);
+    return result;
   });
 }
