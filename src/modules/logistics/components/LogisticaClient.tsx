@@ -13,6 +13,7 @@ import {
   ClipboardList,
   AlertCircle,
   X
+  , Download, Printer
 } from "lucide-react";
 import { actualizarEstadoEnvio, asignarEntrega, informarEntregaFallida } from "@/modules/logistics/actions/logistics.actions";
 
@@ -38,6 +39,10 @@ export function LogisticaClient({ sales, sucursales, employees }: LogisticaClien
   const [observaciones, setObservaciones] = useState("");
   const [evidenciaUrl, setEvidenciaUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [noteSale, setNoteSale] = useState<any>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  async function downloadNote() { setDownloading(true); try { const element = document.getElementById("delivery-note-pdf"); if (!element) return; const html2canvas = (await import("html2canvas")).default; const { jsPDF } = await import("jspdf"); const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#ffffff" }); const pdf = new jsPDF("p", "mm", "a4"); const width = 190; pdf.addImage(canvas.toDataURL("image/png"), "PNG", 10, 10, width, canvas.height * width / canvas.width); pdf.save(`nota-entrega-${noteSale.id}.pdf`); } finally { setDownloading(false); } }
 
   // Filtrar ventas
   const filteredSales = sales.filter((sale) => {
@@ -213,6 +218,7 @@ export function LogisticaClient({ sales, sucursales, employees }: LogisticaClien
                     </span>
                   )}
                 </div>
+                <button onClick={() => setNoteSale(sale)} className="rounded border px-2 py-1 text-xs font-semibold"><Printer size={13} className="inline" /> Nota de entrega</button>
 
                 <div className="flex items-center gap-3">
                   {/* Badge de estado */}
@@ -325,6 +331,8 @@ export function LogisticaClient({ sales, sucursales, employees }: LogisticaClien
       </div>
 
       {/* MODAL DE TRANSICIÓN LOGÍSTICA */}
+      {noteSale && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="max-h-[90vh] w-full max-w-xl overflow-auto rounded-xl bg-white"><div id="delivery-note-pdf" className="space-y-4 p-6 text-sm"><h3 className="text-center text-xl font-bold">Nota de entrega #{noteSale.id}</h3><p className="text-center font-semibold uppercase text-amber-700">Documento interno no fiscal</p><div className="grid grid-cols-2 gap-2"><p><strong>Cliente:</strong> {noteSale.entrega.clienteNombre}</p><p><strong>Teléfono:</strong> {noteSale.entrega.clienteTelefono || "-"}</p><p className="col-span-2"><strong>Dirección:</strong> {noteSale.entrega.direccion || "-"}</p><p><strong>Encargado:</strong> {noteSale.entrega.encargado?.nombre || "-"}</p><p><strong>Chofer:</strong> {noteSale.entrega.chofer?.nombre || "-"}</p></div><table className="w-full border-collapse"><thead><tr><th className="border p-2 text-left">Producto</th><th className="border p-2 text-right">Cantidad</th></tr></thead><tbody>{noteSale.detalles.map((detail: any) => <tr key={detail.id}><td className="border p-2">{detail.producto.codigo} · {detail.producto.nombre}</td><td className="border p-2 text-right">{detail.cantidad} {detail.producto.unidadVenta}</td></tr>)}</tbody></table><p><strong>Observaciones:</strong> {noteSale.entrega.observaciones || noteSale.observaciones || "-"}</p></div><div className="flex gap-2 border-t p-3"><button onClick={() => setNoteSale(null)} className="flex-1 rounded border p-2">Cerrar</button><button onClick={() => window.print()} className="flex-1 rounded border p-2"><Printer size={14} className="inline" /> Imprimir</button><button onClick={downloadNote} disabled={downloading} className="flex-1 rounded bg-slate-900 p-2 text-white"><Download size={14} className="inline" /> PDF</button></div></div></div>}
+
       {isModalOpen && selectedSaleId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl border">
