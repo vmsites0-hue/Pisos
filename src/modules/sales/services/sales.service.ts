@@ -159,6 +159,7 @@ export async function procesarVenta(input: VentaInput) {
         detallesToCreate.push({
           productoId: item.productoId,
           varianteId: variant.id,
+          inventarioId: inv!.id,
           cantidad: conversion.actualQuantity,
           cantidadSolicitada: conversion.requestedQuantity,
           cantidadPresentacion: conversion.presentationQuantity,

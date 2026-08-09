@@ -1,4 +1,4 @@
-export const STOCK_MOVEMENT_TYPES = ["INGRESO", "VENTA", "RESERVA", "LIBERACION", "AJUSTE", "DEVOLUCION", "PERDIDA"] as const;
+export const STOCK_MOVEMENT_TYPES = ["INGRESO", "VENTA", "RESERVA", "LIBERACION", "AJUSTE", "DEVOLUCION", "PERDIDA", "CANCELACION_VENTA"] as const;
 export type StockMovementType = (typeof STOCK_MOVEMENT_TYPES)[number];
 
 export function resultingStock(current: number, delta: number) {

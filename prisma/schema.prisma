@@ -31,6 +31,7 @@ model Usuario {
   notificaciones         Notificacion[]
   eventosPresentacion    EventoPresentacionInventario[]
   reservasCreadas        ReservaStock[]
+  cancelacionesVenta     CancelacionVenta[]
 }
 
 model Rol {
@@ -357,6 +358,7 @@ model Inventario {
   movimientos     MovimientoInventario[]
   eventosPresentacion EventoPresentacionInventario[]
   lineasReserva LineaReservaStock[]
+  detallesVenta DetalleVenta[]
 
   @@unique([productoId, sucursalId, loteTono])
   @@index([varianteId, sucursalId, lote, tono, calibre])
@@ -485,6 +487,18 @@ model Venta {
   reglaDescuento ReglaDescuento? @relation(fields: [reglaDescuentoId], references: [id])
   detalles       DetalleVenta[]
   entrega        Entrega?
+  cancelacion    CancelacionVenta?
+}
+
+model CancelacionVenta {
+  id            Int      @id @default(autoincrement())
+  ventaId       Int      @unique
+  motivo        String
+  usuarioId     Int
+  aprobacionId  Int?
+  creadaEn      DateTime @default(now())
+  venta         Venta    @relation(fields: [ventaId], references: [id])
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id])
 }
 
 model Entrega {
@@ -506,6 +520,7 @@ model DetalleVenta {
   ventaId        Int
   productoId     Int
   varianteId     Int?
+  inventarioId   Int?
   
   cantidad       Float     // Puede ser m2 o cajas
   cantidadSolicitada Float?
@@ -521,6 +536,7 @@ model DetalleVenta {
   venta          Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   producto       Producto  @relation(fields: [productoId], references: [id])
   variante       VarianteProducto? @relation(fields: [varianteId], references: [id])
+  inventario     Inventario? @relation(fields: [inventarioId], references: [id])
 }
 
 // ==========================================
