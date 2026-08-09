@@ -103,6 +103,16 @@ model PoliticaAprobacion {
   permitirAutoAprobacion   Boolean @default(false)
 }
 
+model ParametroSistema {
+  clave               String   @id
+  tipo                String
+  valor               String
+  valorPredeterminado String
+  descripcion         String
+  validacion          String
+  actualizadoEn       DateTime @updatedAt
+}
+
 model RegistroAuditoria {
   id            Int       @id @default(autoincrement())
   usuarioId     Int?
@@ -248,6 +258,7 @@ model Venta {
   tipoEntrega    String        @default("ENVIO") // ENVIO o RETIRO
   chofer         String?       // Chofer asignado para envíos
   observaciones  String?       // Notas de observación para el despacho
+  configuracionSnapshot String  @default("{}")
 
   sucursal       Sucursal      @relation(fields: [sucursalId], references: [id])
   usuario        Usuario       @relation(fields: [usuarioId], references: [id])
@@ -281,6 +292,7 @@ model Presupuesto {
   descuento      Float                @default(0)
   total          Float
   validezDias    Int                  @default(15)
+  configuracionSnapshot String        @default("{}")
   
   cliente        Cliente              @relation(fields: [clienteId], references: [id])
   sucursal       Sucursal             @relation(fields: [sucursalId], references: [id])
