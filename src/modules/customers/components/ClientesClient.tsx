@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { ClienteForm } from "./ClienteForm";
 import { deleteCliente } from "@/modules/customers/actions/customers.actions";
+import { customerSearchText } from "@/modules/customers/domain/customer";
 
 interface ClientesClientProps {
   clientes: any[];
@@ -27,18 +28,12 @@ export function ClientesClient({ clientes }: ClientesClientProps) {
   // Filtrar clientes
   const filteredClientes = clientes.filter((cli) => {
     const query = searchQuery.toLowerCase();
-    return (
-      cli.nombre.toLowerCase().includes(query) ||
-      cli.apellido.toLowerCase().includes(query) ||
-      cli.documento.toLowerCase().includes(query) ||
-      (cli.ruc && cli.ruc.toLowerCase().includes(query)) ||
-      (cli.telefono && cli.telefono.includes(query))
-    );
+    return customerSearchText({ name: cli.nombre, lastName: cli.apellido, legalName: cli.razonSocial, document: cli.documento, taxId: cli.ruc, phone: cli.telefono }).includes(query);
   });
 
   // Eliminar Cliente
   async function handleDeleteCliente(id: number, fullName: string) {
-    if (!confirm(`¿Estás seguro de eliminar al cliente "${fullName}"?\nEsta acción no se puede deshacer.`)) return;
+    if (!confirm(`¿Eliminar o desactivar al cliente "${fullName}"? Si tiene historial se conservará como inactivo.`)) return;
 
     const res = await deleteCliente(id);
     if (res.error) {
@@ -125,7 +120,8 @@ export function ClientesClient({ clientes }: ClientesClientProps) {
                   <tr key={cli.id} className="hover:bg-slate-50 transition-colors">
                     {/* Nombre y Documento */}
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900">{cli.nombre} {cli.apellido}</div>
+                      <div className="font-semibold text-slate-900">{cli.razonSocial || `${cli.nombre} ${cli.apellido}`}</div>
+                      {!cli.activo && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">INACTIVO</span>}
                       <div className="text-slate-500 text-xs mt-0.5 space-x-2">
                         <span>CI: {cli.documento}</span>
                         {cli.ruc && <span className="text-slate-400">| RUC: {cli.ruc}</span>}

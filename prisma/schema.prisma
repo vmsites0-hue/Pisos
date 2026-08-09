@@ -423,6 +423,9 @@ model Cliente {
   sucursalId     Int
   nombre         String
   apellido       String
+  tipo           String        @default("PERSONA")
+  razonSocial    String?
+  activo         Boolean       @default(true)
   documento      String        @unique // CI o DNI
   ruc            String?       @unique
   telefono       String?
@@ -440,6 +443,7 @@ model Cliente {
   sucursal       Sucursal      @relation(fields: [sucursalId], references: [id])
 
   @@index([sucursalId])
+  @@index([activo, nombre, apellido])
 }
 
 // ==========================================
