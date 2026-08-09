@@ -492,6 +492,7 @@ model Venta {
   entrega        Entrega?
   cancelacion    CancelacionVenta?
   devoluciones   Devolucion[]
+  credito        CreditoVenta?
 }
 
 model CancelacionVenta {
@@ -720,4 +721,38 @@ model PlanCredito {
   precisionMonetaria    Int      @default(0)
   activo                Boolean  @default(true)
   creadoEn              DateTime @default(now())
+  creditos              CreditoVenta[]
+}
+
+model CreditoVenta {
+  id             Int      @id @default(autoincrement())
+  ventaId        Int      @unique
+  planCreditoId  Int
+  principal      Float
+  interesTotal   Float
+  totalFinanciado Float
+  saldoPendiente Float
+  estado         String   @default("ACTIVO")
+  planSnapshot   String
+  creadoEn       DateTime @default(now())
+  venta          Venta    @relation(fields: [ventaId], references: [id])
+  planCredito    PlanCredito @relation(fields: [planCreditoId], references: [id])
+  cuotas         CuotaCredito[]
+}
+
+model CuotaCredito {
+  id             Int      @id @default(autoincrement())
+  creditoVentaId Int
+  numero         Int
+  venceEn        DateTime
+  capital        Float
+  interes        Float
+  monto          Float
+  saldo          Float
+  pagado         Float    @default(0)
+  estado         String   @default("PENDIENTE")
+  creditoVenta   CreditoVenta @relation(fields: [creditoVentaId], references: [id], onDelete: Cascade)
+
+  @@unique([creditoVentaId, numero])
+  @@index([estado, venceEn])
 }

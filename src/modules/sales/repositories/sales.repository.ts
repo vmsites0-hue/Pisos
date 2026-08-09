@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 
 export async function getSalesPageData() {
-  const [branches, categories, customers, products, inventory] = await Promise.all([
+  const [branches, categories, customers, products, inventory, creditPlans] = await Promise.all([
     getMainBranch().then((branch) => [branch]),
     prisma.categoria.findMany({ orderBy: { nombre: "asc" } }),
     prisma.cliente.findMany({ where: { activo: true, sucursal: { esPrincipal: true } }, orderBy: { nombre: "asc" } }),
@@ -12,7 +12,8 @@ export async function getSalesPageData() {
       where: { stockActual: { gt: 0 }, sucursal: { esPrincipal: true, activa: true } },
       orderBy: { producto: { codigo: "asc" } },
     }),
+    prisma.planCredito.findMany({ where: { activo: true }, orderBy: { nombre: "asc" } }),
   ]);
 
-  return { branches, categories, customers, products, inventory };
+  return { branches, categories, customers, products, inventory, creditPlans };
 }
