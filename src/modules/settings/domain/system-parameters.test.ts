@@ -4,7 +4,7 @@ import { buildParameterSnapshot, parameterDefinition, SYSTEM_PARAMETERS, validat
 describe("system parameters", () => {
   it("defines required parameters with valid defaults and descriptions", () => {
     expect(SYSTEM_PARAMETERS.map((item) => item.key)).toEqual([
-      "MONEDA", "PRECISION_DECIMALES", "IMPUESTO_PORCENTAJE", "PRESUPUESTO_VALIDEZ_DIAS", "REDONDEO_MODO", "APROBACION_AJUSTE_NEGATIVO",
+      "MONEDA", "PRECISION_DECIMALES", "IMPUESTO_PORCENTAJE", "PRESUPUESTO_VALIDEZ_DIAS", "REDONDEO_MODO", "APROBACION_AJUSTE_NEGATIVO", "RESERVA_DURACION_DIAS",
     ]);
     for (const item of SYSTEM_PARAMETERS) {
       expect(item.description).not.toBe("");

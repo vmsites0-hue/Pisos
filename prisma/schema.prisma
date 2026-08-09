@@ -537,12 +537,16 @@ model ReservaStock {
   estado        String   @default("ACTIVA")
   creadaEn      DateTime @default(now())
   actualizadaEn DateTime @updatedAt
+  venceEn       DateTime?
+  liberadaEn    DateTime?
+  motivoLiberacion String?
 
   presupuesto Presupuesto @relation(fields: [presupuestoId], references: [id])
   creadaPor Usuario @relation(fields: [creadaPorId], references: [id])
   lineas LineaReservaStock[]
 
   @@index([presupuestoId, estado])
+  @@index([estado, venceEn])
 }
 
 model LineaReservaStock {

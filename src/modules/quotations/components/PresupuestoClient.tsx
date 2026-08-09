@@ -325,6 +325,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
                       </td>
                       <td className="px-6 py-4 text-right font-medium text-slate-600">
                         {p.validezDias} días (Hasta {limiteFecha.toLocaleDateString("es-PY")})
+                        {p.reservas?.map((reservation: any) => <span key={reservation.id} className="mt-1 block text-[10px] text-blue-700">Reserva #{reservation.id}: {reservation.estado}{reservation.venceEn ? ` · vence ${new Date(reservation.venceEn).toLocaleString("es-PY")}` : " · sin vencimiento"}</span>)}
                       </td>
                       <td className="px-6 py-4 text-right font-bold text-slate-900">
                         {formatMoney(p.total)}

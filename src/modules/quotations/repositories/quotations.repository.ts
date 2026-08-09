@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import { expireDueReservations } from "@/modules/reservations/services/expiration.service";
 
 export async function getQuotationsPageData() {
+  await expireDueReservations();
   const [products, customers, categories, quotations] = await Promise.all([
     prisma.producto.findMany({
       include: { categoria: true, variantes: { where: { activa: true }, orderBy: { id: "asc" } } },
