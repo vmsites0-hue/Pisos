@@ -17,6 +17,7 @@ export const SYSTEM_PARAMETERS: ParameterDefinition[] = [
   { key: "APROBACION_AJUSTE_NEGATIVO", type: "BOOLEAN", defaultValue: "true", description: "Exige aprobación para reducir existencias manualmente", validation: {} },
   { key: "RESERVA_DURACION_DIAS", type: "NUMBER", defaultValue: "7", description: "Duración predeterminada de reservas con vencimiento", validation: { min: 1, max: 365, integer: true } },
   { key: "DESCUENTO_MANUAL_LIMITE_PORCENTAJE", type: "NUMBER", defaultValue: "5", description: "Descuento manual máximo aplicable sin aprobación", validation: { min: 0, max: 100 } },
+  { key: "DEVOLUCION_CUARENTENA_HABILITADA", type: "BOOLEAN", defaultValue: "true", description: "Permite enviar productos devueltos a cuarentena", validation: {} },
 ];
 
 export function validateParameterValue(definition: ParameterDefinition, value: string) {
