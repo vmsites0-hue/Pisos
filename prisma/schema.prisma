@@ -30,6 +30,7 @@ model Usuario {
   movimientosInventario  MovimientoInventario[]
   notificaciones         Notificacion[]
   eventosPresentacion    EventoPresentacionInventario[]
+  reservasCreadas        ReservaStock[]
 }
 
 model Rol {
@@ -349,6 +350,7 @@ model Inventario {
   sucursal        Sucursal  @relation(fields: [sucursalId], references: [id])
   movimientos     MovimientoInventario[]
   eventosPresentacion EventoPresentacionInventario[]
+  lineasReserva LineaReservaStock[]
 
   @@unique([productoId, sucursalId, loteTono])
   @@index([varianteId, sucursalId, lote, tono, calibre])
@@ -504,6 +506,7 @@ model Presupuesto {
   cliente        Cliente              @relation(fields: [clienteId], references: [id])
   sucursal       Sucursal             @relation(fields: [sucursalId], references: [id])
   detalles       DetallePresupuesto[]
+  reservas       ReservaStock[]
 
   @@index([sucursalId])
 }
@@ -524,6 +527,38 @@ model DetallePresupuesto {
   presupuesto    Presupuesto @relation(fields: [presupuestoId], references: [id], onDelete: Cascade)
   producto       Producto    @relation(fields: [productoId], references: [id])
   variante       VarianteProducto? @relation(fields: [varianteId], references: [id])
+  lineasReserva  LineaReservaStock[]
+}
+
+model ReservaStock {
+  id            Int      @id @default(autoincrement())
+  presupuestoId Int
+  creadaPorId   Int
+  estado        String   @default("ACTIVA")
+  creadaEn      DateTime @default(now())
+  actualizadaEn DateTime @updatedAt
+
+  presupuesto Presupuesto @relation(fields: [presupuestoId], references: [id])
+  creadaPor Usuario @relation(fields: [creadaPorId], references: [id])
+  lineas LineaReservaStock[]
+
+  @@index([presupuestoId, estado])
+}
+
+model LineaReservaStock {
+  id                    Int @id @default(autoincrement())
+  reservaId             Int
+  detallePresupuestoId  Int
+  inventarioId          Int
+  cantidad              Float
+  estado                String @default("ACTIVA")
+
+  reserva ReservaStock @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+  detallePresupuesto DetallePresupuesto @relation(fields: [detallePresupuestoId], references: [id])
+  inventario Inventario @relation(fields: [inventarioId], references: [id])
+
+  @@index([detallePresupuestoId, estado])
+  @@index([inventarioId, estado])
 }
 
 // ==========================================
