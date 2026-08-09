@@ -4,6 +4,7 @@ import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { hashPassword } from "@/modules/auth/domain/password";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { recordAudit } from "@/modules/audit/services/audit.service";
+import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 
 function positiveIds(formData: FormData, field: string) {
   return formData.getAll(field).map(Number).filter((id) => Number.isInteger(id) && id > 0);
@@ -20,7 +21,7 @@ export async function createUser(formData: FormData) {
     throw new Error("Nombre, correo, contraseña de 10 caracteres y al menos un rol son obligatorios.");
   }
 
-  const mainBranch = await prisma.sucursal.findFirstOrThrow({ where: { activa: true } });
+  const mainBranch = await getMainBranch();
   const created = await prisma.usuario.create({
     data: {
       nombre,

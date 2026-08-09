@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { recordAudit } from "@/modules/audit/services/audit.service";
+import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -22,11 +23,13 @@ export interface VentaInput {
 
 export async function procesarVenta(input: VentaInput) {
   const authenticatedUser = await requirePermission(PERMISSIONS.SALES_CREATE);
+  const mainBranch = await getMainBranch();
 
   try {
-    const { sucursalId, clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles } = input;
+    const { clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles } = input;
+    const sucursalId = mainBranch.id;
 
-    if (!sucursalId || !clienteId || !metodoPago || detalles.length === 0) {
+    if (!clienteId || !metodoPago || detalles.length === 0) {
       return { error: "Faltan datos obligatorios para procesar la venta." };
     }
 

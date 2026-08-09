@@ -6,9 +6,10 @@ export async function getQuotationsPageData() {
       include: { categoria: true },
       orderBy: { nombre: "asc" },
     }),
-    prisma.cliente.findMany({ orderBy: { nombre: "asc" } }),
+    prisma.cliente.findMany({ where: { sucursal: { esPrincipal: true } }, orderBy: { nombre: "asc" } }),
     prisma.categoria.findMany({ orderBy: { nombre: "asc" } }),
     prisma.presupuesto.findMany({
+      where: { sucursal: { esPrincipal: true } },
       include: {
         cliente: true,
         detalles: { include: { producto: true } },

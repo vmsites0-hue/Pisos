@@ -60,7 +60,7 @@ const rolePermissions = {
 
 async function main() {
   let mainBranch = await prisma.sucursal.findFirst({
-    where: { nombre: "Local principal" },
+    where: { esPrincipal: true },
   });
 
   if (!mainBranch) {
@@ -68,7 +68,13 @@ async function main() {
       data: {
         nombre: "Local principal",
         activa: true,
+        esPrincipal: true,
       },
+    });
+  } else if (!mainBranch.activa) {
+    mainBranch = await prisma.sucursal.update({
+      where: { id: mainBranch.id },
+      data: { activa: true },
     });
   }
 
