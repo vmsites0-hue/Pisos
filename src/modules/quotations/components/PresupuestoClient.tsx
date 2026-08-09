@@ -16,6 +16,8 @@ import {
   Download
 } from "lucide-react";
 import { crearPresupuesto, eliminarPresupuesto } from "@/modules/quotations/actions/quotations.actions";
+import { ManualReservationForm } from "@/modules/reservations/components/ManualReservationForm";
+import { ReservationActions } from "@/modules/reservations/components/ReservationActions";
 
 interface PresupuestoClientProps {
   products: any[];
@@ -136,6 +138,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
         ...cart,
         {
           productoId: prod.id,
+          varianteId: prod.variantes?.[0]?.id,
           codigo: prod.codigo,
           nombre: prod.nombre,
           unidadVenta: prod.unidadVenta,
@@ -214,6 +217,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
       descuento,
       detalles: cart.map(item => ({
         productoId: item.productoId,
+        varianteId: item.varianteId,
         cantidad: item.cantidad,
         precioUnitario: item.precioVenta
       }))
@@ -322,11 +326,14 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
                       </td>
                       <td className="px-6 py-4 text-right font-medium text-slate-600">
                         {p.validezDias} días (Hasta {limiteFecha.toLocaleDateString("es-PY")})
+                        {p.reservas?.map((reservation: any) => <span key={reservation.id} className="mt-1 block text-[10px] text-blue-700">Reserva #{reservation.id}: {reservation.estado}{reservation.venceEn ? ` · vence ${new Date(reservation.venceEn).toLocaleString("es-PY")}` : " · sin vencimiento"}</span>)}
                       </td>
                       <td className="px-6 py-4 text-right font-bold text-slate-900">
                         {formatMoney(p.total)}
                       </td>
                       <td className="px-6 py-4 text-center space-x-1.5">
+                        <ManualReservationForm quotation={p} />
+                        {p.reservas?.map((reservation: any) => <ReservationActions key={reservation.id} reservation={reservation} />)}
                         <button
                           onClick={() => handleViewPresupuesto(p)}
                           className="px-2 py-1 text-xs border rounded bg-white text-slate-600 hover:bg-slate-50 font-semibold cursor-pointer"

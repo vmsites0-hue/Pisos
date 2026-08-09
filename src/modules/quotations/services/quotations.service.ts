@@ -8,6 +8,7 @@ import { calculateProductQuantity } from "@/modules/inventory/domain/quantity-co
 
 export interface DetallePresupuestoInput {
   productoId: number;
+  varianteId?: number | null;
   cantidad: number;
   precioUnitario: number;
 }
@@ -44,11 +45,13 @@ export async function crearPresupuesto(input: PresupuestoInput) {
     for (const item of detalles) {
       const producto = await prisma.producto.findUnique({
         where: { id: item.productoId },
-        include: { variantes: { where: { activa: true }, orderBy: { id: "asc" }, take: 1, include: { unidadBase: true, presentaciones: { where: { activa: true }, include: { unidad: true } } } } },
+        include: { variantes: { where: { activa: true, ...(item.varianteId ? { id: item.varianteId } : {}) }, orderBy: { id: "asc" }, include: { unidadBase: true, presentaciones: { where: { activa: true }, include: { unidad: true } } } } },
       });
       if (!producto) {
         return { error: `El producto con ID ${item.productoId} no existe.` };
       }
+      const variant = producto.variantes[0];
+      if (!variant) return { error: `El producto "${producto.nombre}" no tiene una variante activa.` };
 
       const conversion = calculateProductQuantity(producto, item.cantidad);
       const itemSubtotal = conversion.actualQuantity * item.precioUnitario;
@@ -56,6 +59,7 @@ export async function crearPresupuesto(input: PresupuestoInput) {
 
       detallesToCreate.push({
         productoId: item.productoId,
+        varianteId: variant.id,
         cantidad: conversion.actualQuantity,
         cantidadSolicitada: conversion.requestedQuantity,
         cantidadPresentacion: conversion.presentationQuantity,

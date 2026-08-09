@@ -6,6 +6,7 @@ export const PERMISSIONS = {
   PRODUCTS_MANAGE: "products.manage",
   INVENTORY_ADJUST: "inventory.adjust",
   QUOTATIONS_MANAGE: "quotations.manage",
+  RESERVATIONS_MANAGE: "reservations.manage",
   SALES_CREATE: "sales.create",
   DISCOUNTS_MANAGE: "discounts.manage",
   LOGISTICS_UPDATE: "logistics.update",

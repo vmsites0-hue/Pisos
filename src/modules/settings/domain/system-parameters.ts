@@ -15,6 +15,7 @@ export const SYSTEM_PARAMETERS: ParameterDefinition[] = [
   { key: "PRESUPUESTO_VALIDEZ_DIAS", type: "NUMBER", defaultValue: "15", description: "Vigencia predeterminada de presupuestos", validation: { min: 0, max: 365, integer: true } },
   { key: "REDONDEO_MODO", type: "STRING", defaultValue: "NEAREST", description: "Modo general de redondeo", validation: { options: ["NEAREST", "UP", "DOWN"] } },
   { key: "APROBACION_AJUSTE_NEGATIVO", type: "BOOLEAN", defaultValue: "true", description: "Exige aprobación para reducir existencias manualmente", validation: {} },
+  { key: "RESERVA_DURACION_DIAS", type: "NUMBER", defaultValue: "7", description: "Duración predeterminada de reservas con vencimiento", validation: { min: 1, max: 365, integer: true } },
 ];
 
 export function validateParameterValue(definition: ParameterDefinition, value: string) {
