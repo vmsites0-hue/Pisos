@@ -7,6 +7,7 @@ import { getSystemParameterSnapshot } from "@/modules/settings/services/system-p
 import { calculateProductQuantity } from "@/modules/inventory/domain/quantity-conversion";
 import { canEditQuotation, resolveQuotationExpiration, validateQuotationTotals } from "@/modules/quotations/domain/quotation";
 import { recordAudit } from "@/modules/audit/services/audit.service";
+import { normalizeRecalculationPolicy, quotationValuesChanged } from "@/modules/quotations/domain/recalculation";
 
 export interface DetallePresupuestoInput {
   productoId: number;
@@ -22,6 +23,7 @@ export interface PresupuestoInput {
   detalles: DetallePresupuestoInput[];
   expirationMode?: "NONE" | "DEFAULT" | "CUSTOM";
   customExpiration?: string | null;
+  recalculationPolicy?: string;
 }
 
 async function buildQuotationLines(detalles: DetallePresupuestoInput[]) {
@@ -76,6 +78,7 @@ export async function crearPresupuesto(input: PresupuestoInput) {
         total,
         validezDias: Number(configurationSnapshot.PRESUPUESTO_VALIDEZ_DIAS ?? 15),
         venceEn: expiresAt,
+        politicaRecalculo: normalizeRecalculationPolicy(input.recalculationPolicy ?? "CONSERVAR"),
         configuracionSnapshot: JSON.stringify(configurationSnapshot),
         detalles: {
           create: detallesToCreate,
@@ -111,11 +114,27 @@ export async function actualizarPresupuesto(id: number, input: PresupuestoInput)
     const expiresAt = resolveQuotationExpiration(input.expirationMode ?? "NONE", Number(configurationSnapshot.PRESUPUESTO_VALIDEZ_DIAS ?? 15), input.customExpiration, new Date());
     const updated = await prisma.$transaction(async (tx) => {
       await tx.detallePresupuesto.deleteMany({ where: { presupuestoId: id } });
-      const result = await tx.presupuesto.update({ where: { id }, data: { clienteId: input.clienteId, subtotal, descuento: input.descuento, total, venceEn: expiresAt, configuracionSnapshot: JSON.stringify(configurationSnapshot), detalles: { create: lines } }, include: { detalles: { include: { producto: true, variante: true, presentacion: true } }, cliente: true } });
+      const result = await tx.presupuesto.update({ where: { id }, data: { clienteId: input.clienteId, subtotal, descuento: input.descuento, total, venceEn: expiresAt, politicaRecalculo: normalizeRecalculationPolicy(input.recalculationPolicy ?? "CONSERVAR"), configuracionSnapshot: JSON.stringify(configurationSnapshot), detalles: { create: lines } }, include: { detalles: { include: { producto: true, variante: true, presentacion: true } }, cliente: true } });
       await recordAudit({ userId: actor.id, action: "PRESUPUESTO_ACTUALIZADO", entity: "Presupuesto", entityId: id, before, after: result }, tx); return result;
     });
     revalidatePath("/presupuestos"); return { success: true, presupuesto: updated };
   } catch (error: unknown) { return { error: error instanceof Error ? error.message : "Error al actualizar el presupuesto." }; }
+}
+
+export async function recalcularPresupuesto(id: number) {
+  const actor = await requirePermission(PERMISSIONS.QUOTATIONS_MANAGE);
+  try {
+    const before = await prisma.presupuesto.findUniqueOrThrow({ where: { id }, include: { detalles: { include: { variante: true } }, reservas: { where: { estado: { in: ["ACTIVA", "PARCIALMENTE_CONSUMIDA"] } } } } });
+    if (!canEditQuotation(before.estado)) return { error: "Solo se puede recalcular un presupuesto abierto." };
+    const { subtotal, lines } = await buildQuotationLines(before.detalles.map((detail) => ({ productoId: detail.productoId, varianteId: detail.varianteId, cantidad: detail.cantidadSolicitada ?? detail.cantidad, precioUnitario: detail.variante?.precioVenta ?? detail.precioUnitario, descuento: detail.descuento })));
+    const total = validateQuotationTotals(subtotal, before.descuento);
+    const previousSnapshot = { subtotal: before.subtotal, total: before.total, lines: before.detalles.map((detail) => ({ variantId: detail.varianteId, quantity: detail.cantidad, presentationQuantity: detail.cantidadPresentacion, price: detail.precioUnitario, subtotal: detail.subtotal })) };
+    const currentSnapshot = { subtotal, total, lines: lines.map((line) => ({ variantId: line.varianteId, quantity: line.cantidad, presentationQuantity: line.cantidadPresentacion, price: line.precioUnitario, subtotal: line.subtotal })) };
+    if (!quotationValuesChanged(previousSnapshot, currentSnapshot)) return { success: true, changed: false };
+    if (before.reservas.length) return { error: "Existe una variación, pero primero debe liberar la reserva activa." };
+    const updated = await prisma.$transaction(async (tx) => { await tx.detallePresupuesto.deleteMany({ where: { presupuestoId: id } }); const result = await tx.presupuesto.update({ where: { id }, data: { subtotal, total, detalles: { create: lines } }, include: { detalles: { include: { producto: true, variante: true, presentacion: true } }, cliente: true } }); await recordAudit({ userId: actor.id, action: "PRESUPUESTO_RECALCULADO", entity: "Presupuesto", entityId: id, before, after: result }, tx); return result; });
+    revalidatePath("/presupuestos"); return { success: true, changed: true, presupuesto: updated };
+  } catch (error: unknown) { return { error: error instanceof Error ? error.message : "No se pudo recalcular el presupuesto." }; }
 }
 
 export async function eliminarPresupuesto(id: number) {

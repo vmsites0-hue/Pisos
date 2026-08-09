@@ -510,6 +510,7 @@ model Presupuesto {
   estado         String               @default("ABIERTO")
   venceEn        DateTime?
   actualizadoEn  DateTime             @updatedAt
+  politicaRecalculo String             @default("CONSERVAR")
   
   cliente        Cliente              @relation(fields: [clienteId], references: [id])
   sucursal       Sucursal             @relation(fields: [sucursalId], references: [id])
