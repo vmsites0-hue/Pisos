@@ -4,7 +4,7 @@ import { requireAuthenticatedUser } from "@/modules/auth/services/session.servic
 
 export default async function LogisticaPage() {
   await requireAuthenticatedUser();
-  const { sales, branches } = await getLogisticsPageData();
+  const { sales, branches, employees } = await getLogisticsPageData();
 
-  return <LogisticaClient sales={sales} sucursales={branches} />;
+  return <LogisticaClient sales={sales} sucursales={branches} employees={employees} />;
 }
