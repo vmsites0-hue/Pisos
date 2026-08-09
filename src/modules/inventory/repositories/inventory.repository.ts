@@ -14,7 +14,7 @@ export async function getInventoryPageData() {
     getMainBranch().then((branch) => [branch]),
     prisma.inventario.findMany({
       where: { sucursal: { esPrincipal: true, activa: true } },
-      include: { producto: true, sucursal: true },
+      include: { producto: true, sucursal: true, variante: { include: { unidadBase: true, valores: { include: { atributo: true } }, presentaciones: { where: { activa: true }, include: { unidad: true } } } } },
       orderBy: { producto: { codigo: "asc" } },
     }),
   ]);

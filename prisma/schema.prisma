@@ -266,6 +266,9 @@ model VarianteProducto {
   unidadBase UnidadMedida?         @relation("UnidadBaseVariante", fields: [unidadBaseId], references: [id])
   valores  VarianteAtributoValor[]
   presentaciones PresentacionVariante[]
+  inventarios Inventario[]
+  detallesVenta DetalleVenta[]
+  detallesPresupuesto DetallePresupuesto[]
 
   @@index([productoId])
 }
@@ -323,15 +326,21 @@ model Inventario {
   productoId      Int
   sucursalId      Int
   loteTono        String?   // Tono o calibre para cerámicas
+  varianteId      Int?
+  lote             String?
+  tono             String?
+  calibre          String?
   stockActual     Float     @default(0)
   stockReservado  Float     @default(0)
   
   actualizado     DateTime  @updatedAt
 
   producto        Producto  @relation(fields: [productoId], references: [id])
+  variante        VarianteProducto? @relation(fields: [varianteId], references: [id])
   sucursal        Sucursal  @relation(fields: [sucursalId], references: [id])
 
   @@unique([productoId, sucursalId, loteTono])
+  @@index([varianteId, sucursalId, lote, tono, calibre])
 }
 
 // ==========================================
@@ -394,6 +403,7 @@ model DetalleVenta {
   id             Int       @id @default(autoincrement())
   ventaId        Int
   productoId     Int
+  varianteId     Int?
   
   cantidad       Float     // Puede ser m2 o cajas
   cantidadSolicitada Float?
@@ -404,6 +414,7 @@ model DetalleVenta {
   
   venta          Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   producto       Producto  @relation(fields: [productoId], references: [id])
+  variante       VarianteProducto? @relation(fields: [varianteId], references: [id])
 }
 
 // ==========================================
@@ -432,6 +443,7 @@ model DetallePresupuesto {
   id             Int         @id @default(autoincrement())
   presupuestoId  Int
   productoId     Int
+  varianteId     Int?
   
   cantidad       Float
   cantidadSolicitada Float?
@@ -442,6 +454,7 @@ model DetallePresupuesto {
   
   presupuesto    Presupuesto @relation(fields: [presupuestoId], references: [id], onDelete: Cascade)
   producto       Producto    @relation(fields: [productoId], references: [id])
+  variante       VarianteProducto? @relation(fields: [varianteId], references: [id])
 }
 
 // ==========================================
