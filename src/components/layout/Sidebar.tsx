@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   ScrollText
   ,Bell
+  ,FileSpreadsheet
 } from "lucide-react";
 
 export function Sidebar() {
@@ -31,6 +32,7 @@ export function Sidebar() {
         <SidebarItem href="/aprobaciones" icon={<ShieldCheck size={20} />} label="Aprobaciones" />
         <SidebarItem href="/auditoria" icon={<ScrollText size={20} />} label="Auditoría" />
         <SidebarItem href="/notificaciones" icon={<Bell size={20} />} label="Notificaciones" />
+        <SidebarItem href="/reportes" icon={<FileSpreadsheet size={20} />} label="Reportes" />
       </nav>
       
       <div className="p-4 border-t">
