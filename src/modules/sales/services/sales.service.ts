@@ -4,6 +4,7 @@ import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { recordAudit } from "@/modules/audit/services/audit.service";
 import { getMainBranch } from "@/modules/branches/services/main-branch.service";
+import { getSystemParameterSnapshot } from "@/modules/settings/services/system-parameters.service";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -24,6 +25,7 @@ export interface VentaInput {
 export async function procesarVenta(input: VentaInput) {
   const authenticatedUser = await requirePermission(PERMISSIONS.SALES_CREATE);
   const mainBranch = await getMainBranch();
+  const configurationSnapshot = await getSystemParameterSnapshot();
 
   try {
     const { clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles } = input;
@@ -139,6 +141,7 @@ export async function procesarVenta(input: VentaInput) {
           estado: estadoInicial,
           metodoPago,
           tipoEntrega,
+          configuracionSnapshot: JSON.stringify(configurationSnapshot),
           detalles: {
             create: detallesToCreate,
           },

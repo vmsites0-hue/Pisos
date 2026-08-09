@@ -38,6 +38,7 @@ const permissions = [
   ["approvals.review", "Aprobar o rechazar operaciones restringidas"],
   ["approvals.policy.manage", "Configurar políticas de aprobación"],
   ["audit.view", "Consultar registros de auditoría"],
+  ["settings.manage", "Administrar parámetros generales"],
 ];
 
 const roles = [
@@ -144,6 +145,21 @@ async function main() {
     update: {},
     create: { id: 1, permitirAutoAprobacion: false },
   });
+
+  const systemParameters = [
+    ["MONEDA", "STRING", "PYG", "Moneda usada en precios y totales", { options: ["PYG", "USD"] }],
+    ["PRECISION_DECIMALES", "NUMBER", "2", "Cantidad de decimales para cantidades", { min: 0, max: 4, integer: true }],
+    ["IMPUESTO_PORCENTAJE", "NUMBER", "10", "Porcentaje impositivo informativo", { min: 0, max: 100 }],
+    ["PRESUPUESTO_VALIDEZ_DIAS", "NUMBER", "15", "Vigencia predeterminada de presupuestos", { min: 0, max: 365, integer: true }],
+    ["REDONDEO_MODO", "STRING", "NEAREST", "Modo general de redondeo", { options: ["NEAREST", "UP", "DOWN"] }],
+  ];
+  for (const [key, type, defaultValue, description, validation] of systemParameters) {
+    await prisma.parametroSistema.upsert({
+      where: { clave: key },
+      update: { tipo: type, valorPredeterminado: defaultValue, descripcion: description, validacion: JSON.stringify(validation) },
+      create: { clave: key, tipo: type, valor: defaultValue, valorPredeterminado: defaultValue, descripcion: description, validacion: JSON.stringify(validation) },
+    });
+  }
 
   console.info(`Seed completado. Local principal: ${mainBranch.nombre}. Admin: ${adminEmail}.`);
 }

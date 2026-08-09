@@ -68,6 +68,10 @@ solicitud y cada aprobación puede consumirse una sola vez.
 sensibles. Contraseñas, tokens, cookies y secretos se redactan antes de guardar
 los valores anteriores o posteriores.
 
+El MVP opera con un único local principal asignado automáticamente. Los
+parámetros comerciales se administran en `/configuracion`; cada venta y
+presupuesto conserva un snapshot de los valores vigentes al confirmarse.
+
 ## Base local histórica
 
 El repositorio original contenía `dev.db` sin historial de migraciones. No se debe ejecutar la migración inicial sobre esa base como si estuviera vacía.
