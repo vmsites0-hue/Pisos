@@ -14,7 +14,7 @@ import {
   AlertCircle,
   X
 } from "lucide-react";
-import { actualizarEstadoEnvio, asignarEntrega } from "@/modules/logistics/actions/logistics.actions";
+import { actualizarEstadoEnvio, asignarEntrega, informarEntregaFallida } from "@/modules/logistics/actions/logistics.actions";
 
 interface LogisticaClientProps {
   sales: any[];
@@ -29,7 +29,7 @@ export function LogisticaClient({ sales, sucursales, employees }: LogisticaClien
   
   // Modales de transición
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<"EN_PREPARACION" | "LISTO_DESPACHO" | "EN_CAMINO" | "ENTREGADO">("EN_PREPARACION");
+  const [modalType, setModalType] = useState<"EN_PREPARACION" | "LISTO_DESPACHO" | "EN_CAMINO" | "ENTREGADO" | "ENTREGA_FALLIDA">("EN_PREPARACION");
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
   
   // Inputs del modal
@@ -56,7 +56,7 @@ export function LogisticaClient({ sales, sucursales, employees }: LogisticaClien
     return matchesTab && matchesBranch && matchesSearch;
   });
 
-  const openTransitionModal = (saleId: number, type: "EN_PREPARACION" | "LISTO_DESPACHO" | "EN_CAMINO" | "ENTREGADO") => {
+  const openTransitionModal = (saleId: number, type: "EN_PREPARACION" | "LISTO_DESPACHO" | "EN_CAMINO" | "ENTREGADO" | "ENTREGA_FALLIDA") => {
     setSelectedSaleId(saleId);
     setModalType(type);
     setChofer(0);
@@ -72,6 +72,10 @@ export function LogisticaClient({ sales, sucursales, employees }: LogisticaClien
 
     setLoading(true);
     const finalObservacion = observaciones.trim();
+    if (modalType === "ENTREGA_FALLIDA") {
+      const failed = await informarEntregaFallida({ saleId: selectedSaleId, reason: finalObservacion });
+      setLoading(false); if (failed.error) alert(failed.error); else setIsModalOpen(false); return;
+    }
 
     // Si pasamos a encargado, guardamos el encargado en la nota
     if (modalType === "EN_PREPARACION") {
@@ -261,7 +265,7 @@ export function LogisticaClient({ sales, sucursales, employees }: LogisticaClien
                     </button>
                   )}
                   {sale.estado === "EN_CAMINO" && (
-                    <button onClick={() => openTransitionModal(sale.id, "ENTREGADO")} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1.5"><Check size={14} /><span>Confirmar entrega</span></button>
+                    <><button onClick={() => openTransitionModal(sale.id, "ENTREGADO")} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1.5"><Check size={14} /><span>Confirmar entrega</span></button><button onClick={() => openTransitionModal(sale.id, "ENTREGA_FALLIDA")} className="rounded bg-red-600 px-3 py-1.5 text-xs font-bold text-white"><AlertCircle size={14} className="inline" /> Fallida</button></>
                   )}
                 </div>
               </div>
@@ -332,6 +336,7 @@ export function LogisticaClient({ sales, sucursales, employees }: LogisticaClien
                   {modalType === "LISTO_DESPACHO" && "Marcar listo para despacho"}
                   {modalType === "EN_CAMINO" && "Confirmar despacho (en camino)"}
                   {modalType === "ENTREGADO" && "Confirmar Entrega Final"}
+                  {modalType === "ENTREGA_FALLIDA" && "Informar entrega fallida"}
                 </span>
               </h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
@@ -356,8 +361,9 @@ export function LogisticaClient({ sales, sucursales, employees }: LogisticaClien
 
               {/* Observación general (nota de observación) */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Nota de Observación</label>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">{modalType === "ENTREGA_FALLIDA" ? "Motivo obligatorio" : "Nota de Observación"}</label>
                 <textarea
+                  required={modalType === "ENTREGA_FALLIDA"}
                   value={observaciones}
                   onChange={(e) => setObservaciones(e.target.value)}
                   rows={3}
