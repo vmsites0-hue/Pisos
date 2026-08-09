@@ -34,6 +34,10 @@ model Usuario {
   cancelacionesVenta     CancelacionVenta[]
   devoluciones           Devolucion[]
   pagosCuota             PagoCuota[]
+  eventosEntrega         EventoEntrega[]
+  entregasComoEncargado  Entrega[] @relation("EntregaEncargado")
+  entregasComoChofer     Entrega[] @relation("EntregaChofer")
+  entregasConfirmadas    Entrega[] @relation("EntregaConfirmadaPor")
 }
 
 model Rol {
@@ -514,11 +518,35 @@ model Entrega {
   clienteNombre   String
   clienteTelefono String?
   direccion       String?
+  observaciones   String?
+  encargadoId     Int?
+  choferId        Int?
+  confirmadoPorId Int?
+  confirmadoEn   DateTime?
+  evidenciaUrl   String?
   creadaEn        DateTime @default(now())
   actualizadaEn   DateTime @updatedAt
   venta           Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  encargado       Usuario? @relation("EntregaEncargado", fields: [encargadoId], references: [id])
+  chofer          Usuario? @relation("EntregaChofer", fields: [choferId], references: [id])
+  confirmadoPor   Usuario? @relation("EntregaConfirmadaPor", fields: [confirmadoPorId], references: [id])
+  eventos         EventoEntrega[]
 
   @@index([estado, creadaEn])
+}
+
+model EventoEntrega {
+  id           Int      @id @default(autoincrement())
+  entregaId    Int
+  usuarioId    Int
+  estadoAnterior String
+  estadoNuevo  String
+  observacion  String?
+  creadoEn     DateTime @default(now())
+  entrega      Entrega  @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+  usuario      Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([entregaId, creadoEn])
 }
 
 model DetalleVenta {

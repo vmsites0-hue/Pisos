@@ -13,29 +13,36 @@ import {
   ClipboardList,
   AlertCircle,
   X
+  , Download, Printer
 } from "lucide-react";
-import { actualizarEstadoEnvio } from "@/modules/logistics/actions/logistics.actions";
+import { actualizarEstadoEnvio, asignarEntrega, informarEntregaFallida } from "@/modules/logistics/actions/logistics.actions";
 
 interface LogisticaClientProps {
   sales: any[];
   sucursales: any[];
+  employees: any[];
 }
 
-export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
-  const [activeTab, setActiveTab] = useState<"PENDIENTE" | "ENCARGADO" | "DESPACHADO" | "ENTREGADO">("PENDIENTE");
+export function LogisticaClient({ sales, sucursales, employees }: LogisticaClientProps) {
+  const [activeTab, setActiveTab] = useState<"PENDIENTE" | "EN_PREPARACION" | "LISTO_DESPACHO" | "EN_CAMINO" | "ENTREGADO" | "ENTREGA_FALLIDA" | "CANCELADO">("PENDIENTE");
   const [searchQuery, setSearchQuery] = useState("");
   const [sucursalFilter, setSucursalFilter] = useState("all");
   
   // Modales de transición
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<"ENCARGADO" | "DESPACHADO" | "ENTREGADO">("ENCARGADO");
+  const [modalType, setModalType] = useState<"EN_PREPARACION" | "LISTO_DESPACHO" | "EN_CAMINO" | "ENTREGADO" | "ENTREGA_FALLIDA">("EN_PREPARACION");
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
   
   // Inputs del modal
-  const [chofer, setChofer] = useState("");
-  const [encargado, setEncargado] = useState("");
+  const [chofer, setChofer] = useState(0);
+  const [encargado, setEncargado] = useState(0);
   const [observaciones, setObservaciones] = useState("");
+  const [evidenciaUrl, setEvidenciaUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [noteSale, setNoteSale] = useState<any>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  async function downloadNote() { setDownloading(true); try { const element = document.getElementById("delivery-note-pdf"); if (!element) return; const html2canvas = (await import("html2canvas")).default; const { jsPDF } = await import("jspdf"); const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#ffffff" }); const pdf = new jsPDF("p", "mm", "a4"); const width = 190; pdf.addImage(canvas.toDataURL("image/png"), "PNG", 10, 10, width, canvas.height * width / canvas.width); pdf.save(`nota-entrega-${noteSale.id}.pdf`); } finally { setDownloading(false); } }
 
   // Filtrar ventas
   const filteredSales = sales.filter((sale) => {
@@ -54,12 +61,13 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
     return matchesTab && matchesBranch && matchesSearch;
   });
 
-  const openTransitionModal = (saleId: number, type: "ENCARGADO" | "DESPACHADO" | "ENTREGADO") => {
+  const openTransitionModal = (saleId: number, type: "EN_PREPARACION" | "LISTO_DESPACHO" | "EN_CAMINO" | "ENTREGADO" | "ENTREGA_FALLIDA") => {
     setSelectedSaleId(saleId);
     setModalType(type);
-    setChofer("");
-    setEncargado("");
+    setChofer(0);
+    setEncargado(0);
     setObservaciones("");
+    setEvidenciaUrl("");
     setIsModalOpen(true);
   };
 
@@ -68,18 +76,29 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
     if (!selectedSaleId) return;
 
     setLoading(true);
-    let finalObservacion = observaciones.trim();
+    const finalObservacion = observaciones.trim();
+    if (modalType === "ENTREGA_FALLIDA") {
+      const failed = await informarEntregaFallida({ saleId: selectedSaleId, reason: finalObservacion });
+      setLoading(false); if (failed.error) alert(failed.error); else setIsModalOpen(false); return;
+    }
 
     // Si pasamos a encargado, guardamos el encargado en la nota
-    if (modalType === "ENCARGADO") {
-      finalObservacion = `[Preparado por: ${encargado.trim()}] ${finalObservacion}`;
+    if (modalType === "EN_PREPARACION") {
+      const assigned = await asignarEntrega({ saleId: selectedSaleId, managerId: encargado });
+      if (assigned.error) { setLoading(false); alert(assigned.error); return; }
+    }
+    if (modalType === "EN_CAMINO") {
+      const current = sales.find((sale) => sale.id === selectedSaleId);
+      const assigned = await asignarEntrega({ saleId: selectedSaleId, managerId: current?.entrega?.encargadoId, driverId: chofer });
+      if (assigned.error) { setLoading(false); alert(assigned.error); return; }
     }
 
     const res = await actualizarEstadoEnvio(
       selectedSaleId, 
       modalType, 
-      modalType === "DESPACHADO" ? chofer.trim() : undefined,
-      finalObservacion ? finalObservacion : undefined
+      undefined,
+      finalObservacion ? finalObservacion : undefined,
+      modalType === "ENTREGADO" ? evidenciaUrl : undefined,
     );
     
     setLoading(false);
@@ -111,24 +130,30 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
           Pendiente ({sales.filter(s => s.estado === "PENDIENTE").length})
         </button>
         <button
-          onClick={() => setActiveTab("ENCARGADO")}
+          onClick={() => setActiveTab("EN_PREPARACION")}
           className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
-            activeTab === "ENCARGADO"
+            activeTab === "EN_PREPARACION"
               ? "border-slate-900 text-slate-900"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
-          Encargado / Preparación ({sales.filter(s => s.estado === "ENCARGADO").length})
+          En preparación ({sales.filter(s => s.estado === "EN_PREPARACION").length})
         </button>
         <button
-          onClick={() => setActiveTab("DESPACHADO")}
+          onClick={() => setActiveTab("LISTO_DESPACHO")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${activeTab === "LISTO_DESPACHO" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-900"}`}
+        >
+          Listo ({sales.filter(s => s.estado === "LISTO_DESPACHO").length})
+        </button>
+        <button
+          onClick={() => setActiveTab("EN_CAMINO")}
           className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
-            activeTab === "DESPACHADO"
+            activeTab === "EN_CAMINO"
               ? "border-slate-900 text-slate-900"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
-          En Camino ({sales.filter(s => s.estado === "DESPACHADO").length})
+          En Camino ({sales.filter(s => s.estado === "EN_CAMINO").length})
         </button>
         <button
           onClick={() => setActiveTab("ENTREGADO")}
@@ -193,23 +218,24 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
                     </span>
                   )}
                 </div>
+                <button onClick={() => setNoteSale(sale)} className="rounded border px-2 py-1 text-xs font-semibold"><Printer size={13} className="inline" /> Nota de entrega</button>
 
                 <div className="flex items-center gap-3">
                   {/* Badge de estado */}
                   <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                     sale.estado === "PENDIENTE"
                       ? "bg-amber-50 text-amber-700 border border-amber-200"
-                      : sale.estado === "ENCARGADO"
+                      : sale.estado === "EN_PREPARACION"
                       ? "bg-purple-50 text-purple-700 border border-purple-200"
-                      : sale.estado === "DESPACHADO"
+                      : sale.estado === "EN_CAMINO"
                       ? "bg-blue-50 text-blue-700 border border-blue-200"
                       : "bg-emerald-50 text-emerald-700 border border-emerald-200"
                   }`}>
                     {sale.estado === "PENDIENTE" 
                       ? "Pendiente" 
-                      : sale.estado === "ENCARGADO" 
+                      : sale.estado === "EN_PREPARACION"
                       ? "Encargado (Preparando)" 
-                      : sale.estado === "DESPACHADO" 
+                      : sale.estado === "EN_CAMINO"
                       ? "En camino" 
                       : "Entregado"}
                   </span>
@@ -217,7 +243,7 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
                   {/* Acciones */}
                   {sale.estado === "PENDIENTE" && (
                     <button
-                      onClick={() => openTransitionModal(sale.id, "ENCARGADO")}
+                      onClick={() => openTransitionModal(sale.id, "EN_PREPARACION")}
                       className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <ClipboardList size={14} />
@@ -225,24 +251,27 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
                     </button>
                   )}
 
-                  {sale.estado === "ENCARGADO" && (
+                  {sale.estado === "EN_PREPARACION" && (
                     <button
-                      onClick={() => openTransitionModal(sale.id, "DESPACHADO")}
+                      onClick={() => openTransitionModal(sale.id, "LISTO_DESPACHO")}
                       className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Truck size={14} />
-                      <span>Despachar (En Camino)</span>
+                      <span>Listo para despacho</span>
                     </button>
                   )}
 
-                  {sale.estado === "DESPACHADO" && (
+                  {sale.estado === "LISTO_DESPACHO" && (
                     <button
-                      onClick={() => openTransitionModal(sale.id, "ENTREGADO")}
+                      onClick={() => openTransitionModal(sale.id, "EN_CAMINO")}
                       className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Check size={14} />
-                      <span>Confirmar Entrega</span>
+                      <span>Iniciar recorrido</span>
                     </button>
+                  )}
+                  {sale.estado === "EN_CAMINO" && (
+                    <><button onClick={() => openTransitionModal(sale.id, "ENTREGADO")} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1.5"><Check size={14} /><span>Confirmar entrega</span></button><button onClick={() => openTransitionModal(sale.id, "ENTREGA_FALLIDA")} className="rounded bg-red-600 px-3 py-1.5 text-xs font-bold text-white"><AlertCircle size={14} className="inline" /> Fallida</button></>
                   )}
                 </div>
               </div>
@@ -261,10 +290,10 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
                   {sale.cliente.direccion && <div className="text-slate-500 text-xs italic mt-1">Dirección: {sale.cliente.direccion}</div>}
                   
                   {/* Chofer asignado */}
-                  {sale.chofer && (
+                  {sale.entrega?.chofer && (
                     <div className="mt-3 p-2 bg-slate-50 border rounded text-xs text-slate-700 flex items-center gap-1">
                       <Truck size={12} className="text-slate-400" />
-                      <span><strong>Chofer:</strong> {sale.chofer}</span>
+                      <span><strong>Chofer:</strong> {sale.entrega.chofer.nombre}</span>
                     </div>
                   )}
 
@@ -302,6 +331,8 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
       </div>
 
       {/* MODAL DE TRANSICIÓN LOGÍSTICA */}
+      {noteSale && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="max-h-[90vh] w-full max-w-xl overflow-auto rounded-xl bg-white"><div id="delivery-note-pdf" className="space-y-4 p-6 text-sm"><h3 className="text-center text-xl font-bold">Nota de entrega #{noteSale.id}</h3><p className="text-center font-semibold uppercase text-amber-700">Documento interno no fiscal</p><div className="grid grid-cols-2 gap-2"><p><strong>Cliente:</strong> {noteSale.entrega.clienteNombre}</p><p><strong>Teléfono:</strong> {noteSale.entrega.clienteTelefono || "-"}</p><p className="col-span-2"><strong>Dirección:</strong> {noteSale.entrega.direccion || "-"}</p><p><strong>Encargado:</strong> {noteSale.entrega.encargado?.nombre || "-"}</p><p><strong>Chofer:</strong> {noteSale.entrega.chofer?.nombre || "-"}</p></div><table className="w-full border-collapse"><thead><tr><th className="border p-2 text-left">Producto</th><th className="border p-2 text-right">Cantidad</th></tr></thead><tbody>{noteSale.detalles.map((detail: any) => <tr key={detail.id}><td className="border p-2">{detail.producto.codigo} · {detail.producto.nombre}</td><td className="border p-2 text-right">{detail.cantidad} {detail.producto.unidadVenta}</td></tr>)}</tbody></table><p><strong>Observaciones:</strong> {noteSale.entrega.observaciones || noteSale.observaciones || "-"}</p></div><div className="flex gap-2 border-t p-3"><button onClick={() => setNoteSale(null)} className="flex-1 rounded border p-2">Cerrar</button><button onClick={() => window.print()} className="flex-1 rounded border p-2"><Printer size={14} className="inline" /> Imprimir</button><button onClick={downloadNote} disabled={downloading} className="flex-1 rounded bg-slate-900 p-2 text-white"><Download size={14} className="inline" /> PDF</button></div></div></div>}
+
       {isModalOpen && selectedSaleId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl border">
@@ -309,9 +340,11 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
               <h3 className="text-lg font-bold flex items-center gap-2">
                 <Truck className="text-slate-500" size={18} />
                 <span>
-                  {modalType === "ENCARGADO" && "Asignar Encargado"}
-                  {modalType === "DESPACHADO" && "Confirmar Despacho (En camino)"}
+                  {modalType === "EN_PREPARACION" && "Iniciar preparación"}
+                  {modalType === "LISTO_DESPACHO" && "Marcar listo para despacho"}
+                  {modalType === "EN_CAMINO" && "Confirmar despacho (en camino)"}
                   {modalType === "ENTREGADO" && "Confirmar Entrega Final"}
+                  {modalType === "ENTREGA_FALLIDA" && "Informar entrega fallida"}
                 </span>
               </h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
@@ -320,38 +353,25 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
             </div>
 
             <form onSubmit={handleConfirmarTransicion} className="space-y-4">
-              {modalType === "ENCARGADO" && (
+              {modalType === "EN_PREPARACION" && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Encargado de Preparación *</label>
-                  <input
-                    required
-                    type="text"
-                    value={encargado}
-                    onChange={(e) => setEncargado(e.target.value)}
-                    placeholder="Ej. Carlos González"
-                    className="w-full border rounded p-2 text-sm bg-white outline-none focus:border-slate-400"
-                  />
+                  <select required value={encargado} onChange={(e) => setEncargado(Number(e.target.value))} className="w-full border rounded p-2 text-sm bg-white"><option value={0}>Seleccione un empleado</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.nombre}</option>)}</select>
                 </div>
               )}
 
-              {modalType === "DESPACHADO" && (
+              {modalType === "EN_CAMINO" && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Nombre del Chofer / Repartidor *</label>
-                  <input
-                    required
-                    type="text"
-                    value={chofer}
-                    onChange={(e) => setChofer(e.target.value)}
-                    placeholder="Ej. Raúl Benítez"
-                    className="w-full border rounded p-2 text-sm bg-white outline-none focus:border-slate-400"
-                  />
+                  <select required value={chofer} onChange={(e) => setChofer(Number(e.target.value))} className="w-full border rounded p-2 text-sm bg-white"><option value={0}>Seleccione un chofer</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.nombre}</option>)}</select>
                 </div>
               )}
 
               {/* Observación general (nota de observación) */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Nota de Observación</label>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">{modalType === "ENTREGA_FALLIDA" ? "Motivo obligatorio" : "Nota de Observación"}</label>
                 <textarea
+                  required={modalType === "ENTREGA_FALLIDA"}
                   value={observaciones}
                   onChange={(e) => setObservaciones(e.target.value)}
                   rows={3}
@@ -359,6 +379,7 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
                   className="w-full border rounded p-2 text-sm bg-white outline-none focus:border-slate-400"
                 />
               </div>
+              {modalType === "ENTREGADO" && <div><label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Imagen de evidencia (opcional)</label><input type="url" value={evidenciaUrl} onChange={(event) => setEvidenciaUrl(event.target.value)} placeholder="https://..." className="w-full rounded border p-2 text-sm" /></div>}
 
               <div className="flex justify-end gap-3 pt-4 border-t mt-6 font-semibold">
                 <button

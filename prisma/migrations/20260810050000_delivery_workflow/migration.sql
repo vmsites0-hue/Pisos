@@ -1,0 +1,3 @@
+ALTER TABLE "Entrega" ADD COLUMN "observaciones" TEXT;
+CREATE TABLE "EventoEntrega" ("id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "entregaId" INTEGER NOT NULL, "usuarioId" INTEGER NOT NULL, "estadoAnterior" TEXT NOT NULL, "estadoNuevo" TEXT NOT NULL, "observacion" TEXT, "creadoEn" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "EventoEntrega_entregaId_fkey" FOREIGN KEY ("entregaId") REFERENCES "Entrega"("id") ON DELETE CASCADE ON UPDATE CASCADE, CONSTRAINT "EventoEntrega_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE);
+CREATE INDEX "EventoEntrega_entregaId_creadoEn_idx" ON "EventoEntrega"("entregaId", "creadoEn");
