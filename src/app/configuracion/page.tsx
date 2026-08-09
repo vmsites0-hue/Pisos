@@ -11,16 +11,19 @@ import { FamilyAttributesSettings } from "@/modules/inventory/components/FamilyA
 import { getFamilyAttributes } from "@/modules/inventory/services/family-attributes.service";
 import { UnitsSettings } from "@/modules/inventory/components/UnitsSettings";
 import { getUnits } from "@/modules/inventory/services/units.service";
+import { CreditPlanSettings } from "@/modules/credit/components/CreditPlanSettings";
+import { getCreditPlans } from "@/modules/credit/services/credit-plans.service";
 
 export default async function ConfiguracionPage() {
   await requireAuthenticatedUser();
-  const [{ branches, discountRules, categories }, rbac, parameters, classifications, attributes, units] = await Promise.all([
+  const [{ branches, discountRules, categories }, rbac, parameters, classifications, attributes, units, creditPlans] = await Promise.all([
     getSettingsPageData(),
     getRbacSettingsData(),
     getSystemParameters(),
     getClassifications(),
     getFamilyAttributes(),
     getUnits(),
+    getCreditPlans(),
   ]);
 
   return (
@@ -30,6 +33,7 @@ export default async function ConfiguracionPage() {
       <ClassificationSettings {...classifications} />
       <FamilyAttributesSettings attributes={attributes} families={classifications.families} />
       <UnitsSettings units={units} />
+      <CreditPlanSettings plans={creditPlans} />
       <ConfiguracionClient
         sucursales={branches}
         reglas={discountRules}

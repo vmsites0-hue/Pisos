@@ -702,3 +702,22 @@ model ReglaDescuento {
 
   @@index([sucursalId])
 }
+
+model PlanCredito {
+  id                    Int      @id @default(autoincrement())
+  nombre                String
+  sistema               String
+  tasaAnual             Float
+  numeroCuotas          Int
+  periodicidadMeses     Int      @default(1)
+  diasPrimeraCuota      Int      @default(30)
+  politicaAjuste        String   @default("CUOTA_FIJA")
+  politicaMora          String   @default("SIN_MORA")
+  politicaPagoAnticipado String  @default("REDUCIR_PLAZO")
+  tasaVariable          Boolean  @default(false)
+  politicaRecalculo     String   @default("AUTORIZADO")
+  moneda                String   @default("PYG")
+  precisionMonetaria    Int      @default(0)
+  activo                Boolean  @default(true)
+  creadoEn              DateTime @default(now())
+}
