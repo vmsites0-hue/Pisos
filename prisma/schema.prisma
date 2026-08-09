@@ -456,6 +456,7 @@ model Venta {
   sucursalId     Int
   usuarioId      Int
   clienteId      Int
+  presupuestoId  Int?          @unique
   fecha          DateTime      @default(now())
   
   subtotal       Float
@@ -472,6 +473,7 @@ model Venta {
   sucursal       Sucursal      @relation(fields: [sucursalId], references: [id])
   usuario        Usuario       @relation(fields: [usuarioId], references: [id])
   cliente        Cliente       @relation(fields: [clienteId], references: [id])
+  presupuesto    Presupuesto?  @relation(fields: [presupuestoId], references: [id])
   detalles       DetalleVenta[]
 }
 
@@ -516,6 +518,7 @@ model Presupuesto {
   sucursal       Sucursal             @relation(fields: [sucursalId], references: [id])
   detalles       DetallePresupuesto[]
   reservas       ReservaStock[]
+  venta          Venta?
 
   @@index([sucursalId])
   @@index([estado, venceEn])
