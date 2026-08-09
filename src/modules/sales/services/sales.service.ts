@@ -8,6 +8,7 @@ import { getSystemParameterSnapshot } from "@/modules/settings/services/system-p
 import { calculateProductQuantity } from "@/modules/inventory/domain/quantity-conversion";
 import { recordInventoryMovement } from "@/modules/inventory/services/inventory-movements.service";
 import { randomUUID } from "node:crypto";
+import { syncMinimumStockAlert } from "@/modules/inventory/services/minimum-stock.service";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -96,6 +97,7 @@ export async function procesarVenta(input: VentaInput) {
           },
         });
         await recordInventoryMovement(tx, { inventoryId: inv!.id, variantId: variant.id, userId: usuarioId, type: "VENTA", quantity: -conversion.actualQuantity, baseUnit: variant.unidadBase?.codigo ?? producto.unidadVenta, previousBalance: stockActual, resultingBalance: stockActual - conversion.actualQuantity, reason: `Venta confirmada para cliente ${clienteId}`, referenceType: "VENTA", referenceId: operationReference });
+        await syncMinimumStockAlert(tx, inv!.id, usuarioId);
 
         const itemSubtotal = conversion.actualQuantity * item.precioUnitario;
         subtotal += itemSubtotal;

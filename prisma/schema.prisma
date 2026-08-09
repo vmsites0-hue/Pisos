@@ -28,6 +28,7 @@ model Usuario {
   aprobacionesResueltas   SolicitudAprobacion[] @relation("AprobadorAprobacion")
   auditorias              RegistroAuditoria[]
   movimientosInventario  MovimientoInventario[]
+  notificaciones         Notificacion[]
 }
 
 model Rol {
@@ -262,6 +263,7 @@ model VarianteProducto {
   unidadBaseId    Int?
   politicaVenta   String   @default("UNIDADES_ENTERAS")
   multiploVenta   Float?
+  stockMinimo     Float    @default(0)
 
   producto Producto                @relation(fields: [productoId], references: [id], onDelete: Cascade)
   unidadBase UnidadMedida?         @relation("UnidadBaseVariante", fields: [unidadBaseId], references: [id])
@@ -334,6 +336,8 @@ model Inventario {
   calibre          String?
   stockActual     Float     @default(0)
   stockReservado  Float     @default(0)
+  alertaMinimoActiva Boolean @default(false)
+  alertaMinimoSecuencia Int @default(0)
   
   actualizado     DateTime  @updatedAt
 
@@ -367,6 +371,22 @@ model MovimientoInventario {
 
   @@index([inventarioId, creadoEn])
   @@index([varianteId, creadoEn])
+}
+
+model Notificacion {
+  id                Int      @id @default(autoincrement())
+  usuarioId         Int
+  tipo              String
+  titulo            String
+  mensaje           String
+  enlace            String?
+  claveIdempotencia String   @unique
+  leidaEn           DateTime?
+  creadaEn          DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, leidaEn, creadaEn])
 }
 
 // ==========================================
