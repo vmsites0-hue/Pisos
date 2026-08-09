@@ -24,11 +24,12 @@ interface InventarioClientProps {
   categories: any[];
   families: any[];
   brands: any[];
+  units: any[];
   sucursales: any[];
   inventarios: any[];
 }
 
-export function InventarioClient({ products, categories, families, brands, sucursales, inventarios }: InventarioClientProps) {
+export function InventarioClient({ products, categories, families, brands, units, sucursales, inventarios }: InventarioClientProps) {
   const [activeTab, setActiveTab] = useState<"catalogo" | "stock">("catalogo");
   
   // Filtros y búsquedas
@@ -441,6 +442,7 @@ export function InventarioClient({ products, categories, families, brands, sucur
         onClose={() => { setIsProductModalOpen(false); setSelectedProduct(null); }}
         product={selectedProduct}
         categories={categories}
+        units={units}
       />
 
       {/* Modal de Ajuste de Stock */}
