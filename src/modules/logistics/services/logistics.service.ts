@@ -5,6 +5,7 @@ import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { recordAudit } from "@/modules/audit/services/audit.service";
 import { validateDeliveryTransition } from "@/modules/logistics/domain/delivery-state";
 import { canConfirmDelivery } from "@/modules/logistics/domain/delivery-confirmation";
+import { validateDeliveryFailure } from "@/modules/logistics/domain/delivery-failure";
 
 export async function actualizarEstadoEnvio(
   ventaId: number, 
@@ -52,4 +53,24 @@ export async function assignDelivery(input: { saleId: number; managerId: number;
     });
     revalidatePath("/logistica"); return { success: true };
   } catch (error) { return { error: error instanceof Error ? error.message : "No se pudo asignar la entrega." }; }
+}
+
+export async function reportFailedDelivery(input: { saleId: number; reason: string }) {
+  const actor = await requirePermission(PERMISSIONS.LOGISTICS_UPDATE);
+  const canConfirmAny = await hasPermission(PERMISSIONS.DELIVERY_CONFIRM_ANY);
+  try {
+    await prisma.$transaction(async (tx) => {
+      const delivery = await tx.entrega.findUnique({ where: { ventaId: input.saleId } });
+      if (!delivery) throw new Error("La entrega no existe.");
+      validateDeliveryFailure({ state: delivery.estado, reason: input.reason });
+      if (!canConfirmDelivery({ actorId: actor.id, assignedDriverId: delivery.choferId, canConfirmAny })) throw new Error("Solo el chofer asignado o un supervisor puede informar la falla.");
+      await tx.eventoEntrega.create({ data: { entregaId: delivery.id, usuarioId: actor.id, estadoAnterior: "EN_CAMINO", estadoNuevo: "ENTREGA_FALLIDA", observacion: input.reason.trim() } });
+      await tx.eventoEntrega.create({ data: { entregaId: delivery.id, usuarioId: actor.id, estadoAnterior: "ENTREGA_FALLIDA", estadoNuevo: "EN_PREPARACION", observacion: "Reingreso automático al flujo operativo" } });
+      await tx.entrega.update({ where: { id: delivery.id }, data: { estado: "EN_PREPARACION", observaciones: input.reason.trim() } });
+      await tx.venta.update({ where: { id: input.saleId }, data: { estado: "EN_PREPARACION", observaciones: input.reason.trim() } });
+      if (delivery.encargadoId) await tx.notificacion.create({ data: { usuarioId: delivery.encargadoId, tipo: "ENTREGA_FALLIDA", titulo: "Entrega fallida", mensaje: `La venta #${input.saleId} volvió a preparación: ${input.reason.trim()}`, enlace: "/logistica", claveIdempotencia: `delivery:${delivery.id}:failed:${Date.now()}` } });
+      await recordAudit({ userId: actor.id, action: "ENTREGA_FALLIDA", entity: "Entrega", entityId: delivery.id, after: { motivo: input.reason.trim(), estado: "EN_PREPARACION" } }, tx);
+    });
+    revalidatePath("/logistica"); return { success: true };
+  } catch (error) { return { error: error instanceof Error ? error.message : "No se pudo informar la entrega fallida." }; }
 }
