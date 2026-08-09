@@ -15,6 +15,7 @@ import { evaluateCommercialException } from "@/modules/discounts/domain/commerci
 import { requestApproval } from "@/modules/approvals/services/approvals.service";
 import { validateSaleContract } from "@/modules/sales/domain/sale-validation";
 import { calcularDescuentoAutomatico } from "@/modules/discounts/services/discounts.service";
+import { buildDeliverySnapshot } from "@/modules/sales/domain/delivery";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -202,6 +203,7 @@ export async function procesarVenta(input: VentaInput) {
 
       // El estado inicial si es Retiro en Local es ENTREGADO directamente. Si es ENVIO, es PENDIENTE.
       const estadoInicial = tipoEntrega === "RETIRO" ? "ENTREGADO" : "PENDIENTE";
+      const delivery = buildDeliverySnapshot({ deliveryType: tipoEntrega, customer: cliente });
 
       // 4. Crear la Venta y sus Detalles
       const venta = await tx.venta.create({
@@ -223,6 +225,7 @@ export async function procesarVenta(input: VentaInput) {
           detalles: {
             create: detallesToCreate,
           },
+          ...(delivery ? { entrega: { create: delivery } } : {}),
         },
         include: {
           detalles: {
@@ -232,6 +235,7 @@ export async function procesarVenta(input: VentaInput) {
           },
           cliente: true,
           sucursal: true,
+          entrega: true,
         },
       });
       if (reservation) {
