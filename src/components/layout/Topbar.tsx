@@ -1,5 +1,6 @@
 import { Bell, LogOut, Search, Store } from "lucide-react";
 import { logoutAction } from "@/modules/auth/actions/auth.actions";
+import { PushSubscriptionControl } from "@/components/pwa/PushSubscriptionControl";
 
 export function Topbar({ userName }: { userName: string }) {
   const initials = userName
@@ -21,6 +22,7 @@ export function Topbar({ userName }: { userName: string }) {
       </div>
 
       <div className="flex items-center gap-6">
+        <PushSubscriptionControl />
         <div className="flex items-center gap-2 text-sm font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
           <Store size={16} />
           <span>Sucursal Central</span>
