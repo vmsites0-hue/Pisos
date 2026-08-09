@@ -40,6 +40,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
   const [descuentoManual, setDescuentoManual] = useState<number>(0);
   const [descuentoAuto, setDescuentoAuto] = useState<number>(0);
   const [reglaAplicada, setReglaAplicada] = useState<string | null>(null);
+  const [reglaAplicadaId, setReglaAplicadaId] = useState<number | null>(null);
   const [metodoPago, setMetodoPago] = useState<string>("EFECTIVO");
   const [tipoEntrega, setTipoEntrega] = useState<string>("ENVIO");
 
@@ -110,23 +111,28 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
       if (cart.length === 0) {
         setDescuentoAuto(0);
         setReglaAplicada(null);
+        setReglaAplicadaId(null);
         setDescuento(descuentoManual);
         return;
       }
       const items = cart.map(item => ({
         productoId: item.productoId,
         categoriaId: products.find(p => p.id === item.productoId)?.categoriaId || 0,
+        familiaId: products.find(p => p.id === item.productoId)?.familiaId,
+        marcaId: products.find(p => p.id === item.productoId)?.marcaId,
+        varianteId: item.varianteId,
         cantidad: item.cantidad,
         precioUnitario: item.precioVenta,
         subtotal: item.cantidad * item.precioVenta,
       }));
-      const resultado = await calcularDescuentoAutomatico(items);
+      const resultado = await calcularDescuentoAutomatico(items, clienteId || null);
       setDescuentoAuto(resultado.monto);
       setReglaAplicada(resultado.reglaAplicada);
+      setReglaAplicadaId(resultado.reglaAplicadaId);
       setDescuento(resultado.monto + descuentoManual);
     }
     evalDescuento();
-  }, [cart, descuentoManual, products]);
+  }, [cart, descuentoManual, products, clienteId]);
 
   const selectedSucursal = sucursales.find(s => s.id === sucursalId);
   const selectedCliente = clientes.find(c => c.id === clienteId);
@@ -319,6 +325,8 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
       sucursalId,
       clienteId,
       descuento,
+      reglaDescuentoId: reglaAplicadaId,
+      descuentoAutomatico: descuentoAuto,
       metodoPago,
       tipoEntrega,
       detalles: cart.map(item => ({

@@ -31,6 +31,8 @@ export interface VentaInput {
   detalles: DetalleVentaInput[];
   reservaId?: number | null;
   presupuestoId?: number | null;
+  reglaDescuentoId?: number | null;
+  descuentoAutomatico?: number;
 }
 
 export async function procesarVenta(input: VentaInput) {
@@ -40,7 +42,7 @@ export async function procesarVenta(input: VentaInput) {
   const operationReference = randomUUID();
 
   try {
-    const { clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles, reservaId, presupuestoId } = input;
+    const { clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles, reservaId, presupuestoId, reglaDescuentoId, descuentoAutomatico = 0 } = input;
     const sucursalId = mainBranch.id;
 
     if (!clienteId || !metodoPago || detalles.length === 0) {
@@ -171,6 +173,8 @@ export async function procesarVenta(input: VentaInput) {
           usuarioId,
           clienteId,
           presupuestoId,
+          reglaDescuentoId,
+          descuentoAutomatico,
           subtotal,
           descuento,
           total,
