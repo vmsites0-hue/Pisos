@@ -5,22 +5,46 @@ import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 import { getSystemParameterSnapshot } from "@/modules/settings/services/system-parameters.service";
 import { calculateProductQuantity } from "@/modules/inventory/domain/quantity-conversion";
+import { canEditQuotation, resolveQuotationExpiration, validateQuotationTotals } from "@/modules/quotations/domain/quotation";
+import { recordAudit } from "@/modules/audit/services/audit.service";
 
 export interface DetallePresupuestoInput {
   productoId: number;
   varianteId?: number | null;
   cantidad: number;
   precioUnitario: number;
+  descuento?: number;
 }
 
 export interface PresupuestoInput {
   clienteId: number;
   descuento: number;
   detalles: DetallePresupuestoInput[];
+  expirationMode?: "NONE" | "DEFAULT" | "CUSTOM";
+  customExpiration?: string | null;
+}
+
+async function buildQuotationLines(detalles: DetallePresupuestoInput[]) {
+  let subtotal = 0;
+  const lines = [];
+  for (const item of detalles) {
+    const producto = await prisma.producto.findUnique({ where: { id: item.productoId }, include: { variantes: { where: { activa: true, ...(item.varianteId ? { id: item.varianteId } : {}) }, orderBy: { id: "asc" }, include: { unidadBase: true, presentaciones: { where: { activa: true }, include: { unidad: true } } } } } });
+    if (!producto) throw new Error(`El producto con ID ${item.productoId} no existe.`);
+    const variant = producto.variantes[0];
+    if (!variant) throw new Error(`El producto "${producto.nombre}" no tiene una variante activa.`);
+    const conversion = calculateProductQuantity(producto, item.cantidad);
+    const lineDiscount = Number(item.descuento ?? 0);
+    const gross = conversion.actualQuantity * item.precioUnitario;
+    const lineTotal = validateQuotationTotals(gross, lineDiscount);
+    subtotal += lineTotal;
+    const presentation = variant.presentaciones.find((entry) => entry.nombre === conversion.presentationName) ?? variant.presentaciones.find((entry) => entry.predeterminada) ?? null;
+    lines.push({ productoId: item.productoId, varianteId: variant.id, presentacionId: presentation?.id, cantidad: conversion.actualQuantity, cantidadSolicitada: conversion.requestedQuantity, cantidadPresentacion: conversion.presentationQuantity, conversionSnapshot: JSON.stringify(conversion), precioUnitario: item.precioUnitario, descuento: lineDiscount, subtotal: lineTotal });
+  }
+  return { subtotal, lines };
 }
 
 export async function crearPresupuesto(input: PresupuestoInput) {
-  await requirePermission(PERMISSIONS.QUOTATIONS_MANAGE);
+  const actor = await requirePermission(PERMISSIONS.QUOTATIONS_MANAGE);
   const mainBranch = await getMainBranch();
   const configurationSnapshot = await getSystemParameterSnapshot();
   try {
@@ -38,41 +62,9 @@ export async function crearPresupuesto(input: PresupuestoInput) {
       return { error: "El cliente seleccionado no existe." };
     }
 
-    let subtotal = 0;
-    const detallesToCreate = [];
-
-    // 2. Procesar ítems
-    for (const item of detalles) {
-      const producto = await prisma.producto.findUnique({
-        where: { id: item.productoId },
-        include: { variantes: { where: { activa: true, ...(item.varianteId ? { id: item.varianteId } : {}) }, orderBy: { id: "asc" }, include: { unidadBase: true, presentaciones: { where: { activa: true }, include: { unidad: true } } } } },
-      });
-      if (!producto) {
-        return { error: `El producto con ID ${item.productoId} no existe.` };
-      }
-      const variant = producto.variantes[0];
-      if (!variant) return { error: `El producto "${producto.nombre}" no tiene una variante activa.` };
-
-      const conversion = calculateProductQuantity(producto, item.cantidad);
-      const itemSubtotal = conversion.actualQuantity * item.precioUnitario;
-      subtotal += itemSubtotal;
-
-      detallesToCreate.push({
-        productoId: item.productoId,
-        varianteId: variant.id,
-        cantidad: conversion.actualQuantity,
-        cantidadSolicitada: conversion.requestedQuantity,
-        cantidadPresentacion: conversion.presentationQuantity,
-        conversionSnapshot: JSON.stringify(conversion),
-        precioUnitario: item.precioUnitario,
-        subtotal: itemSubtotal,
-      });
-    }
-
-    const total = subtotal - descuento;
-    if (total < 0) {
-      return { error: "El total del presupuesto no puede ser menor a 0." };
-    }
+    const { subtotal, lines: detallesToCreate } = await buildQuotationLines(detalles);
+    const total = validateQuotationTotals(subtotal, descuento);
+    const expiresAt = resolveQuotationExpiration(input.expirationMode ?? "NONE", Number(configurationSnapshot.PRESUPUESTO_VALIDEZ_DIAS ?? 15), input.customExpiration, new Date());
 
     // 3. Crear el Presupuesto y Detalles
     const presupuesto = await prisma.presupuesto.create({
@@ -83,6 +75,7 @@ export async function crearPresupuesto(input: PresupuestoInput) {
         descuento,
         total,
         validezDias: Number(configurationSnapshot.PRESUPUESTO_VALIDEZ_DIAS ?? 15),
+        venceEn: expiresAt,
         configuracionSnapshot: JSON.stringify(configurationSnapshot),
         detalles: {
           create: detallesToCreate,
@@ -91,12 +84,13 @@ export async function crearPresupuesto(input: PresupuestoInput) {
       include: {
         detalles: {
           include: {
-            producto: true,
+            producto: true, variante: true, presentacion: true,
           },
         },
         cliente: true,
       },
     });
+    await recordAudit({ userId: actor.id, action: "PRESUPUESTO_CREADO", entity: "Presupuesto", entityId: presupuesto.id, after: presupuesto });
 
     revalidatePath("/presupuestos");
     return { success: true, presupuesto };
@@ -105,12 +99,33 @@ export async function crearPresupuesto(input: PresupuestoInput) {
   }
 }
 
-export async function eliminarPresupuesto(id: number) {
-  await requirePermission(PERMISSIONS.QUOTATIONS_MANAGE);
+export async function actualizarPresupuesto(id: number, input: PresupuestoInput) {
+  const actor = await requirePermission(PERMISSIONS.QUOTATIONS_MANAGE);
+  const configurationSnapshot = await getSystemParameterSnapshot();
   try {
-    await prisma.presupuesto.delete({
-      where: { id },
+    const before = await prisma.presupuesto.findUniqueOrThrow({ where: { id }, include: { detalles: true, reservas: { where: { estado: { in: ["ACTIVA", "PARCIALMENTE_CONSUMIDA"] } } } } });
+    if (!canEditQuotation(before.estado)) return { error: "Solo se puede editar un presupuesto abierto." };
+    if (before.reservas.length) return { error: "Libere las reservas activas antes de modificar las líneas." };
+    const { subtotal, lines } = await buildQuotationLines(input.detalles);
+    const total = validateQuotationTotals(subtotal, input.descuento);
+    const expiresAt = resolveQuotationExpiration(input.expirationMode ?? "NONE", Number(configurationSnapshot.PRESUPUESTO_VALIDEZ_DIAS ?? 15), input.customExpiration, new Date());
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.detallePresupuesto.deleteMany({ where: { presupuestoId: id } });
+      const result = await tx.presupuesto.update({ where: { id }, data: { clienteId: input.clienteId, subtotal, descuento: input.descuento, total, venceEn: expiresAt, configuracionSnapshot: JSON.stringify(configurationSnapshot), detalles: { create: lines } }, include: { detalles: { include: { producto: true, variante: true, presentacion: true } }, cliente: true } });
+      await recordAudit({ userId: actor.id, action: "PRESUPUESTO_ACTUALIZADO", entity: "Presupuesto", entityId: id, before, after: result }, tx); return result;
     });
+    revalidatePath("/presupuestos"); return { success: true, presupuesto: updated };
+  } catch (error: unknown) { return { error: error instanceof Error ? error.message : "Error al actualizar el presupuesto." }; }
+}
+
+export async function eliminarPresupuesto(id: number) {
+  const actor = await requirePermission(PERMISSIONS.QUOTATIONS_MANAGE);
+  try {
+    const before = await prisma.presupuesto.findUniqueOrThrow({ where: { id }, include: { reservas: true } });
+    if (!canEditQuotation(before.estado)) return { error: "El presupuesto ya fue convertido o cancelado." };
+    if (before.reservas.some((reservation) => ["ACTIVA", "PARCIALMENTE_CONSUMIDA"].includes(reservation.estado))) return { error: "Libere la reserva activa antes de cancelar." };
+    const after = await prisma.presupuesto.update({ where: { id }, data: { estado: "CANCELADO" } });
+    await recordAudit({ userId: actor.id, action: "PRESUPUESTO_CANCELADO", entity: "Presupuesto", entityId: id, before, after });
 
     revalidatePath("/presupuestos");
     return { success: true };
