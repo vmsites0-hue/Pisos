@@ -34,6 +34,7 @@ model Usuario {
   cancelacionesVenta     CancelacionVenta[]
   devoluciones           Devolucion[]
   pagosCuota             PagoCuota[]
+  movimientosFinancieros MovimientoFinanciero[]
   eventosEntrega         EventoEntrega[]
   entregasComoEncargado  Entrega[] @relation("EntregaEncargado")
   entregasComoChofer     Entrega[] @relation("EntregaChofer")
@@ -798,4 +799,23 @@ model PagoCuota {
   usuario     Usuario @relation(fields: [usuarioId], references: [id])
 
   @@index([cuotaId, fecha])
+}
+
+model MovimientoFinanciero {
+  id              Int      @id @default(autoincrement())
+  tipo            String
+  categoria       String
+  importe         Float
+  afectaResultado Boolean
+  afectaCaja      Boolean
+  metodoPago      String?
+  usuarioId       Int
+  referenciaTipo String
+  referenciaId   String
+  descripcion     String
+  creadoEn        DateTime @default(now())
+  usuario         Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([creadoEn, categoria])
+  @@index([referenciaTipo, referenciaId])
 }

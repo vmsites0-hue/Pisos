@@ -4,7 +4,7 @@ import { requireAuthenticatedUser } from "@/modules/auth/services/session.servic
 
 export default async function FinanzasPage() {
   await requireAuthenticatedUser();
-  const { sales, debtorCustomers, expenses, credits } = await getFinancePageData();
+  const { sales, debtorCustomers, expenses, credits, movements } = await getFinancePageData();
 
   return (
     <FinanzasClient
@@ -12,6 +12,7 @@ export default async function FinanzasPage() {
       debtorClients={debtorCustomers}
       gastos={expenses}
       credits={credits}
+      movements={movements}
     />
   );
 }

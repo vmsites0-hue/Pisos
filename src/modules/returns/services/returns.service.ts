@@ -8,6 +8,7 @@ import { inspectReturn } from "@/modules/returns/domain/return-inspection";
 import { recordInventoryMovement } from "@/modules/inventory/services/inventory-movements.service";
 import { syncMinimumStockAlert } from "@/modules/inventory/services/minimum-stock.service";
 import { recordAudit } from "@/modules/audit/services/audit.service";
+import { recordFinancialMovement } from "@/modules/finance/services/financial-movements.service";
 
 export async function registerReturn(input: { saleId: number; saleDetailId: number; quantity: number; condition: string; reason: string; evidenceUrl?: string | null; approvalId?: number | null }) {
   const actor = await requirePermission(PERMISSIONS.SALES_CREATE);
@@ -44,6 +45,7 @@ export async function registerReturn(input: { saleId: number; saleDetailId: numb
       const refund = input.quantity * current.precioUnitario;
       const header = await tx.devolucion.create({ data: { ventaId: sale.id, usuarioId: actor.id, aprobacionId: approval.id, motivo: input.reason.trim(), evidenciaUrl: input.evidenceUrl?.trim() || null, detalles: { create: { detalleVentaId: current.id, inventarioId: current.inventario.id, cantidad: input.quantity, condicion: input.condition, importe: refund } } }, include: { detalles: true } });
       if (current.venta.metodoPago === "CREDITO") await tx.cliente.update({ where: { id: current.venta.clienteId }, data: { saldoDeudor: Math.max(0, current.venta.cliente.saldoDeudor - refund) } });
+      await recordFinancialMovement(tx, { type: "EGRESO", category: inspected.lossQuantity ? "PERDIDA_DEVOLUCION" : "DEVOLUCION", amount: refund, affectsResult: true, affectsCash: current.venta.metodoPago !== "CREDITO", paymentMethod: current.venta.metodoPago, userId: actor.id, referenceType: "DEVOLUCION", referenceId: header.id, description: input.reason });
       const consumed = await tx.solicitudAprobacion.updateMany({ where: { id: approval.id, estado: "APROBADA", ejecutadoEn: null }, data: { estado: "EJECUTADA", ejecutadoEn: new Date() } });
       if (consumed.count !== 1) throw new Error("La aprobación ya fue utilizada.");
       await syncMinimumStockAlert(tx, current.inventario.id, actor.id);

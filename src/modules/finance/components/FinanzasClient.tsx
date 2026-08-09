@@ -23,9 +23,10 @@ interface FinanzasClientProps {
   debtorClients: any[];
   gastos: any[];
   credits: any[];
+  movements: any[];
 }
 
-export function FinanzasClient({ sales, debtorClients, gastos, credits }: FinanzasClientProps) {
+export function FinanzasClient({ sales, debtorClients, gastos, credits, movements }: FinanzasClientProps) {
   // Modal de cobro de clientes
   const [isCobroModalOpen, setIsCobroModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
@@ -305,6 +306,8 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits }: Finanz
         </div>
 
       </div>
+
+      <section className="rounded-xl border bg-white p-4"><h3 className="font-bold">Movimientos financieros del día</h3><div className="mt-2 overflow-x-auto"><table className="w-full text-xs"><thead><tr><th className="p-2 text-left">Fecha</th><th className="p-2 text-left">Categoría</th><th className="p-2 text-left">Método</th><th className="p-2 text-left">Usuario</th><th className="p-2 text-right">Resultado</th><th className="p-2 text-right">Caja</th></tr></thead><tbody>{movements.map((movement) => <tr key={movement.id} className="border-t"><td className="p-2">{new Date(movement.creadoEn).toLocaleString("es-PY")}</td><td className="p-2">{movement.categoria}</td><td className="p-2">{movement.metodoPago || "-"}</td><td className="p-2">{movement.usuario.nombre}</td><td className="p-2 text-right">{movement.afectaResultado ? `${movement.tipo === "EGRESO" ? "-" : "+"}${formatMoney(movement.importe)}` : "-"}</td><td className="p-2 text-right">{movement.afectaCaja ? `${movement.tipo === "EGRESO" ? "-" : "+"}${formatMoney(movement.importe)}` : "-"}</td></tr>)}</tbody></table></div></section>
 
       <section className="rounded-xl border bg-white p-4"><h3 className="font-bold">Cuotas pendientes</h3>{installmentMessage && <p className="mt-2 text-sm">{installmentMessage}</p>}<div className="mt-3 space-y-2">{credits.flatMap((credit) => credit.cuotas.map((installment: any) => <form key={installment.id} action={async (data) => { const result = await registerInstallmentPayment(data); setInstallmentMessage(result.error ?? "Cobro registrado."); }} className="grid grid-cols-2 gap-2 rounded border p-2 text-xs md:grid-cols-6"><span>{credit.venta.cliente.nombre} {credit.venta.cliente.apellido}</span><span>Cuota #{installment.numero} · {new Date(installment.venceEn).toLocaleDateString("es-PY")}</span><span>{installment.estado} · saldo {formatMoney(installment.monto - installment.pagado)}</span><input type="hidden" name="installmentId" value={installment.id} /><input required name="amount" type="number" min="1" max={installment.monto - installment.pagado} placeholder="Monto" className="rounded border p-1" /><select name="paymentMethod" className="rounded border p-1"><option>EFECTIVO</option><option>TARJETA</option><option>TRANSFERENCIA</option></select><button className="rounded bg-slate-900 p-1 text-white">Registrar cobro</button></form>))}</div></section>
 

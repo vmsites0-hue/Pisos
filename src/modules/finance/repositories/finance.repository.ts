@@ -4,7 +4,7 @@ export async function getFinancePageData(now = new Date()) {
   const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);
 
-  const [sales, debtorCustomers, expenses, credits] = await Promise.all([
+  const [sales, debtorCustomers, expenses, credits, movements] = await Promise.all([
     prisma.venta.findMany({
       where: { fecha: { gte: todayStart }, sucursal: { esPrincipal: true } },
       orderBy: { fecha: "desc" },
@@ -18,7 +18,8 @@ export async function getFinancePageData(now = new Date()) {
       orderBy: { fecha: "desc" },
     }),
     prisma.creditoVenta.findMany({ where: { estado: "ACTIVO" }, include: { venta: { include: { cliente: true } }, cuotas: { where: { estado: { not: "PAGADA" } }, orderBy: { numero: "asc" } } }, orderBy: { creadoEn: "desc" } }),
+    prisma.movimientoFinanciero.findMany({ where: { creadoEn: { gte: todayStart } }, include: { usuario: { select: { nombre: true } } }, orderBy: { creadoEn: "desc" } }),
   ]);
 
-  return { sales, debtorCustomers, expenses, credits };
+  return { sales, debtorCustomers, expenses, credits, movements };
 }
