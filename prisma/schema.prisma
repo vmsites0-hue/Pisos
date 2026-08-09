@@ -230,6 +230,21 @@ model Producto {
   detallesVenta     DetalleVenta[]
   detallesPresupuesto DetallePresupuesto[]
   variantes         VarianteProducto[]
+  imagenes          ProductoImagen[]
+}
+
+model ProductoImagen {
+  id         Int     @id @default(autoincrement())
+  productoId Int
+  url        String
+  textoAlt   String?
+  orden      Int     @default(0)
+  principal  Boolean @default(false)
+
+  producto Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  @@unique([productoId, url])
+  @@index([productoId, orden])
 }
 
 model VarianteProducto {
