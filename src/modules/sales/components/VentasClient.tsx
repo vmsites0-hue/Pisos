@@ -838,6 +838,10 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
                   <span>Descuento:</span>
                   <span>- {formatMoney(createdVenta.descuento)}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span>Impuesto incluido:</span>
+                  <span>{formatMoney(createdVenta.detalles.reduce((sum: number, detail: any) => sum + (detail.impuesto || 0), 0))}</span>
+                </div>
                 <div className="flex justify-between font-bold text-sm border-t border-double pt-1">
                   <span>Total de la venta:</span>
                   <span>{formatMoney(createdVenta.total)}</span>
