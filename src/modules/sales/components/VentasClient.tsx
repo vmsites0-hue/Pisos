@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { procesarVenta } from "@/modules/sales/actions/sales.actions";
 import { calcularDescuentoAutomatico } from "@/modules/discounts/actions/discounts.actions";
+import { availableStock, matchesCatalogQuery } from "@/modules/sales/domain/catalog-search";
 
 interface VentasClientProps {
   products: any[];
@@ -140,15 +141,11 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
   const selectedCliente = clientes.find(c => c.id === clienteId);
 
   // Obtener todos los inventarios disponibles en la sucursal seleccionada
-  const availableInventarios = inventarios.filter(inv => inv.sucursalId === sucursalId && (inv.stockActual - inv.stockReservado) > 0);
+  const availableInventarios = inventarios.filter(inv => inv.sucursalId === sucursalId && availableStock(inv.stockActual, inv.stockReservado) > 0);
 
   // Filtrar productos/lotes para mostrar en el catálogo
   const catalogItems = availableInventarios.filter(inv => {
-    const query = searchQuery.toLowerCase();
-    const matchesSearch = 
-      inv.producto.nombre.toLowerCase().includes(query) ||
-      inv.producto.codigo.toLowerCase().includes(query) ||
-      (inv.loteTono && inv.loteTono.toLowerCase().includes(query));
+    const matchesSearch = matchesCatalogQuery(inv, searchQuery);
 
     const matchesCategory = categoryFilter === "all" || inv.producto.categoriaId === parseInt(categoryFilter);
 
@@ -467,6 +464,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
                       <td className="px-4 py-3.5 text-right font-medium">
                         <div className="font-semibold text-slate-900">{stockDisponible} {inv.producto.unidadVenta}</div>
                         <div className="text-[10px] text-slate-400">{stockEnCajas}</div>
+                        <div className="text-[9px] text-slate-500">{inv.variante?.presentaciones?.map((presentation: any) => `${presentation.nombre} (${presentation.factorConversion} ${presentation.unidad.simbolo})`).join(" · ")}</div>
                         {inv.stockReservado > 0 && (
                           <div className="text-[9px] text-amber-600 font-semibold">Res: {inv.stockReservado}</div>
                         )}
@@ -839,6 +837,10 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
                 <div className="flex justify-between">
                   <span>Descuento:</span>
                   <span>- {formatMoney(createdVenta.descuento)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Impuesto incluido:</span>
+                  <span>{formatMoney(createdVenta.detalles.reduce((sum: number, detail: any) => sum + (detail.impuesto || 0), 0))}</span>
                 </div>
                 <div className="flex justify-between font-bold text-sm border-t border-double pt-1">
                   <span>Total de la venta:</span>

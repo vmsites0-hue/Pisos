@@ -8,7 +8,7 @@ export async function getSalesPageData() {
     prisma.cliente.findMany({ where: { activo: true, sucursal: { esPrincipal: true } }, orderBy: { nombre: "asc" } }),
     prisma.producto.findMany({ orderBy: { nombre: "asc" } }),
     prisma.inventario.findMany({
-      include: { producto: true, variante: true, sucursal: true },
+      include: { producto: { include: { marcaCatalogo: true } }, variante: { include: { valores: true, presentaciones: { where: { activa: true }, include: { unidad: true } } } }, sucursal: true },
       where: { stockActual: { gt: 0 }, sucursal: { esPrincipal: true, activa: true } },
       orderBy: { producto: { codigo: "asc" } },
     }),

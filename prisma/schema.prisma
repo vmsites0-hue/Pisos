@@ -484,6 +484,21 @@ model Venta {
   presupuesto    Presupuesto?  @relation(fields: [presupuestoId], references: [id])
   reglaDescuento ReglaDescuento? @relation(fields: [reglaDescuentoId], references: [id])
   detalles       DetalleVenta[]
+  entrega        Entrega?
+}
+
+model Entrega {
+  id              Int      @id @default(autoincrement())
+  ventaId         Int      @unique
+  estado          String   @default("PENDIENTE")
+  clienteNombre   String
+  clienteTelefono String?
+  direccion       String?
+  creadaEn        DateTime @default(now())
+  actualizadaEn   DateTime @updatedAt
+  venta           Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+
+  @@index([estado, creadaEn])
 }
 
 model DetalleVenta {
@@ -498,6 +513,9 @@ model DetalleVenta {
   conversionSnapshot String @default("{}")
   precioUnitario Float
   precioOriginal Float?
+  productoSnapshot String @default("{}")
+  impuesto       Float     @default(0)
+  moneda         String    @default("PYG")
   subtotal       Float
   
   venta          Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)

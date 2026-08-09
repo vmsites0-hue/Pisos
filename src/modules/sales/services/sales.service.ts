@@ -13,6 +13,9 @@ import { syncPhysicalPackaging } from "@/modules/inventory/services/open-present
 import { validateQuotationConversion } from "@/modules/quotations/domain/quotation-conversion";
 import { evaluateCommercialException } from "@/modules/discounts/domain/commercial-exception";
 import { requestApproval } from "@/modules/approvals/services/approvals.service";
+import { validateSaleContract } from "@/modules/sales/domain/sale-validation";
+import { calcularDescuentoAutomatico } from "@/modules/discounts/services/discounts.service";
+import { buildDeliverySnapshot } from "@/modules/sales/domain/delivery";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -47,15 +50,21 @@ export async function procesarVenta(input: VentaInput) {
   const operationReference = randomUUID();
 
   try {
-    const { clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles, reservaId, presupuestoId, reglaDescuentoId, descuentoAutomatico = 0 } = input;
+    const { clienteId, descuento: requestedDiscount, metodoPago, tipoEntrega = "ENVIO", detalles, reservaId, presupuestoId, descuentoAutomatico: clientAutomaticDiscount = 0 } = input;
     const sucursalId = mainBranch.id;
+    validateSaleContract({ clienteId, metodoPago, tipoEntrega, detalles });
 
     const referencePrices = await Promise.all(detalles.map(async (item) => {
-      const variant = await prisma.varianteProducto.findFirst({ where: { productoId: item.productoId, activa: true, ...(item.varianteId ? { id: item.varianteId } : {}) }, orderBy: { id: "asc" } });
-      return { ...item, precioOriginal: variant?.precioVenta ?? item.precioUnitario };
+      const product = await prisma.producto.findUnique({ where: { id: item.productoId }, include: { variantes: { where: { activa: true, ...(item.varianteId ? { id: item.varianteId } : {}) }, orderBy: { id: "asc" }, take: 1 } } });
+      const variant = product?.variantes[0];
+      return { ...item, categoriaId: product?.categoriaId ?? 0, familiaId: product?.familiaId, marcaId: product?.marcaId, precioOriginal: variant?.precioVenta ?? item.precioUnitario };
     }));
     const estimatedSubtotal = referencePrices.reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
-    const manualDiscount = Math.max(0, descuento - descuentoAutomatico);
+    const manualDiscount = Math.max(0, requestedDiscount - clientAutomaticDiscount);
+    const serverPromotion = await calcularDescuentoAutomatico(referencePrices.map((item) => ({ productoId: item.productoId, varianteId: item.varianteId, categoriaId: item.categoriaId, familiaId: item.familiaId, marcaId: item.marcaId, cantidad: item.cantidad, precioUnitario: item.precioUnitario, subtotal: item.cantidad * item.precioUnitario })), clienteId);
+    const descuentoAutomatico = serverPromotion.monto;
+    const reglaDescuentoId = serverPromotion.reglaAplicadaId;
+    const descuento = manualDiscount + descuentoAutomatico;
     const limit = Number(configurationSnapshot.DESCUENTO_MANUAL_LIMITE_PORCENTAJE ?? 5);
     const canManageDiscounts = await hasPermission(PERMISSIONS.DISCOUNTS_MANAGE);
     const exception = evaluateCommercialException({ subtotal: estimatedSubtotal, manualDiscount, discountLimitPercent: limit, hasDiscountPermission: canManageDiscounts, hasManualPriceChange: referencePrices.some((item) => Math.abs(item.precioOriginal - item.precioUnitario) > 0.000001), hasPricePermission: canManageDiscounts });
@@ -81,7 +90,7 @@ export async function procesarVenta(input: VentaInput) {
       const cliente = await tx.cliente.findUnique({
         where: { id: clienteId },
       });
-      if (!cliente) {
+      if (!cliente || !cliente.activo) {
         throw new Error("El cliente seleccionado no existe.");
       }
 
@@ -121,10 +130,11 @@ export async function procesarVenta(input: VentaInput) {
         const reservedLine = item.lineaReservaId ? reservation?.lineas.find((line) => line.id === item.lineaReservaId && line.inventarioId === inv?.id && line.estado === "ACTIVA") : null;
         if (item.lineaReservaId && (!reservedLine || Math.abs(reservedLine.cantidad - conversion.actualQuantity) > 0.000001)) throw new Error("La línea reservada no es válida o su cantidad cambió.");
         const stockActual = inv ? inv.stockActual : 0;
-        if (stockActual < conversion.actualQuantity) {
+        const stockDisponible = reservedLine ? stockActual : stockActual - (inv?.stockReservado ?? 0);
+        if (stockDisponible < conversion.actualQuantity) {
           throw new Error(
             `Stock insuficiente para el producto "${producto.nombre}" [Lote: ${item.loteTono || "Sin especificar"}]. ` +
-            `Disponible: ${stockActual} ${producto.unidadVenta}, Requerido real: ${conversion.actualQuantity} ${producto.unidadVenta}`
+            `Disponible: ${stockDisponible} ${producto.unidadVenta}, Requerido real: ${conversion.actualQuantity} ${producto.unidadVenta}`
           );
         }
 
@@ -155,6 +165,9 @@ export async function procesarVenta(input: VentaInput) {
           conversionSnapshot: JSON.stringify(conversion),
           precioUnitario: item.precioUnitario,
           precioOriginal: referencePrices.find((reference) => reference.productoId === item.productoId && reference.varianteId === item.varianteId)?.precioOriginal ?? item.precioUnitario,
+          productoSnapshot: JSON.stringify({ codigo: producto.codigo, nombre: producto.nombre, sku: variant.sku, unidad: variant.unidadBase?.codigo ?? producto.unidadVenta, presentacion: conversion.presentationName, factorConversion: conversion.conversionFactor }),
+          impuesto: itemSubtotal * Number(configurationSnapshot.IMPUESTO_PORCENTAJE ?? 0) / (100 + Number(configurationSnapshot.IMPUESTO_PORCENTAJE ?? 0)),
+          moneda: String(configurationSnapshot.MONEDA ?? "PYG"),
           subtotal: itemSubtotal,
         });
       }
@@ -190,6 +203,7 @@ export async function procesarVenta(input: VentaInput) {
 
       // El estado inicial si es Retiro en Local es ENTREGADO directamente. Si es ENVIO, es PENDIENTE.
       const estadoInicial = tipoEntrega === "RETIRO" ? "ENTREGADO" : "PENDIENTE";
+      const delivery = buildDeliverySnapshot({ deliveryType: tipoEntrega, customer: cliente });
 
       // 4. Crear la Venta y sus Detalles
       const venta = await tx.venta.create({
@@ -211,6 +225,7 @@ export async function procesarVenta(input: VentaInput) {
           detalles: {
             create: detallesToCreate,
           },
+          ...(delivery ? { entrega: { create: delivery } } : {}),
         },
         include: {
           detalles: {
@@ -220,6 +235,7 @@ export async function procesarVenta(input: VentaInput) {
           },
           cliente: true,
           sucursal: true,
+          entrega: true,
         },
       });
       if (reservation) {
