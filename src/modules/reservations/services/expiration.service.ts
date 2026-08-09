@@ -2,8 +2,13 @@ import { prisma } from "@/lib/prisma";
 import { recordInventoryMovement } from "@/modules/inventory/services/inventory-movements.service";
 import { syncMinimumStockAlert } from "@/modules/inventory/services/minimum-stock.service";
 import { recordAudit } from "@/modules/audit/services/audit.service";
+import { notifyUser } from "@/modules/notifications/services/notification-dispatch.service";
+import { notificationKey } from "@/modules/notifications/domain/events";
 
 export async function expireDueReservations(now = new Date()) {
+  const warningLimit = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const approaching = await prisma.reservaStock.findMany({ where: { estado: "ACTIVA", venceEn: { gt: now, lte: warningLimit } }, select: { id: true, creadaPorId: true, venceEn: true } });
+  for (const reservation of approaching) await notifyUser({ userId: reservation.creadaPorId, type: "RESERVA_PROXIMA_VENCER", title: "Reserva próxima a vencer", message: `La reserva #${reservation.id} vence pronto.`, link: "/presupuestos", idempotencyKey: notificationKey("RESERVA_PROXIMA_VENCER", reservation.id, reservation.creadaPorId) });
   const due = await prisma.reservaStock.findMany({ where: { estado: "ACTIVA", venceEn: { lte: now } }, select: { id: true } });
   let released = 0;
   for (const { id } of due) {

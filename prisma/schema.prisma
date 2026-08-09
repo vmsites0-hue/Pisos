@@ -29,6 +29,7 @@ model Usuario {
   auditorias              RegistroAuditoria[]
   movimientosInventario   MovimientoInventario[]
   notificaciones          Notificacion[]
+  suscripcionesPush       SuscripcionPush[]
   eventosPresentacion     EventoPresentacionInventario[]
   reservasCreadas         ReservaStock[]
   cancelacionesVenta      CancelacionVenta[]
@@ -431,6 +432,21 @@ model Notificacion {
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@index([usuarioId, leidaEn, creadaEn])
+}
+
+model SuscripcionPush {
+  id            Int      @id @default(autoincrement())
+  usuarioId     Int
+  endpoint      String   @unique
+  p256dh        String
+  auth          String
+  dispositivo   String?
+  activa        Boolean  @default(true)
+  creadaEn      DateTime @default(now())
+  actualizadaEn DateTime @updatedAt
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, activa])
 }
 
 // ==========================================

@@ -6,6 +6,8 @@ import { recordAudit } from "@/modules/audit/services/audit.service";
 import { validateDeliveryTransition } from "@/modules/logistics/domain/delivery-state";
 import { canConfirmDelivery } from "@/modules/logistics/domain/delivery-confirmation";
 import { validateDeliveryFailure } from "@/modules/logistics/domain/delivery-failure";
+import { notifyUser } from "@/modules/notifications/services/notification-dispatch.service";
+import { notificationKey } from "@/modules/notifications/domain/events";
 
 export async function actualizarEstadoEnvio(
   ventaId: number, 
@@ -28,6 +30,10 @@ export async function actualizarEstadoEnvio(
       await recordAudit({ userId: user.id, action: "ENTREGA_TRANSICION", entity: "Entrega", entityId: delivery.id, before: { estado: delivery.estado }, after: { estado: nuevoEstado, observaciones } }, tx);
       return result;
     });
+    if (nuevoEstado === "LISTO_DESPACHO") {
+      const recipients = [...new Set([updated.encargadoId, updated.choferId].filter((id): id is number => Boolean(id)))];
+      for (const recipientId of recipients) await notifyUser({ userId: recipientId, type: "PEDIDO_LISTO", title: "Pedido listo", message: `La venta #${ventaId} está lista para despacho.`, link: "/logistica", idempotencyKey: notificationKey("PEDIDO_LISTO", `${updated.id}:${updated.actualizadaEn.toISOString()}`, recipientId) });
+    }
 
     revalidatePath("/logistica");
     revalidatePath("/");
@@ -42,15 +48,16 @@ export async function actualizarEstadoEnvio(
 export async function assignDelivery(input: { saleId: number; managerId: number; driverId?: number | null }) {
   const actor = await requirePermission(PERMISSIONS.DELIVERY_ASSIGN);
   try {
-    await prisma.$transaction(async (tx) => {
+    const assigned = await prisma.$transaction(async (tx) => {
       const delivery = await tx.entrega.findUnique({ where: { ventaId: input.saleId } });
       if (!delivery || ["ENTREGADO", "CANCELADO"].includes(delivery.estado)) throw new Error("La entrega no admite asignaciones.");
       const users = await tx.usuario.findMany({ where: { id: { in: [input.managerId, ...(input.driverId ? [input.driverId] : [])] }, activo: true } });
       if (!users.some((user) => user.id === input.managerId) || (input.driverId && !users.some((user) => user.id === input.driverId))) throw new Error("El encargado o chofer no es un usuario activo.");
       const updated = await tx.entrega.update({ where: { id: delivery.id }, data: { encargadoId: input.managerId, choferId: input.driverId ?? null } });
-      for (const userId of [...new Set([input.managerId, ...(input.driverId ? [input.driverId] : [])])]) await tx.notificacion.create({ data: { usuarioId: userId, tipo: "ENTREGA_ASIGNADA", titulo: "Entrega asignada", mensaje: `Fue asignado a la entrega de la venta #${input.saleId}.`, enlace: "/logistica", claveIdempotencia: `delivery:${delivery.id}:assignment:${userId}:${updated.actualizadaEn.toISOString()}` } });
       await recordAudit({ userId: actor.id, action: "ENTREGA_ASIGNADA", entity: "Entrega", entityId: delivery.id, before: { encargadoId: delivery.encargadoId, choferId: delivery.choferId }, after: { encargadoId: input.managerId, choferId: input.driverId ?? null } }, tx);
+      return updated;
     });
+    for (const recipientId of [...new Set([input.managerId, ...(input.driverId ? [input.driverId] : [])])]) await notifyUser({ userId: recipientId, type: "ENTREGA_ASIGNADA", title: "Entrega asignada", message: `Fuiste asignado a la entrega de la venta #${input.saleId}.`, link: "/logistica", idempotencyKey: notificationKey("ENTREGA_ASIGNADA", `${assigned.id}:${assigned.actualizadaEn.toISOString()}`, recipientId) });
     revalidatePath("/logistica"); return { success: true };
   } catch (error) { return { error: error instanceof Error ? error.message : "No se pudo asignar la entrega." }; }
 }
@@ -59,7 +66,7 @@ export async function reportFailedDelivery(input: { saleId: number; reason: stri
   const actor = await requirePermission(PERMISSIONS.LOGISTICS_UPDATE);
   const canConfirmAny = await hasPermission(PERMISSIONS.DELIVERY_CONFIRM_ANY);
   try {
-    await prisma.$transaction(async (tx) => {
+    const failed = await prisma.$transaction(async (tx) => {
       const delivery = await tx.entrega.findUnique({ where: { ventaId: input.saleId } });
       if (!delivery) throw new Error("La entrega no existe.");
       validateDeliveryFailure({ state: delivery.estado, reason: input.reason });
@@ -68,9 +75,10 @@ export async function reportFailedDelivery(input: { saleId: number; reason: stri
       await tx.eventoEntrega.create({ data: { entregaId: delivery.id, usuarioId: actor.id, estadoAnterior: "ENTREGA_FALLIDA", estadoNuevo: "EN_PREPARACION", observacion: "Reingreso automático al flujo operativo" } });
       await tx.entrega.update({ where: { id: delivery.id }, data: { estado: "EN_PREPARACION", observaciones: input.reason.trim() } });
       await tx.venta.update({ where: { id: input.saleId }, data: { estado: "EN_PREPARACION", observaciones: input.reason.trim() } });
-      if (delivery.encargadoId) await tx.notificacion.create({ data: { usuarioId: delivery.encargadoId, tipo: "ENTREGA_FALLIDA", titulo: "Entrega fallida", mensaje: `La venta #${input.saleId} volvió a preparación: ${input.reason.trim()}`, enlace: "/logistica", claveIdempotencia: `delivery:${delivery.id}:failed:${Date.now()}` } });
       await recordAudit({ userId: actor.id, action: "ENTREGA_FALLIDA", entity: "Entrega", entityId: delivery.id, after: { motivo: input.reason.trim(), estado: "EN_PREPARACION" } }, tx);
+      return { id: delivery.id, managerId: delivery.encargadoId, eventAt: new Date() };
     });
+    if (failed.managerId) await notifyUser({ userId: failed.managerId, type: "ENTREGA_FALLIDA", title: "Entrega fallida", message: `La venta #${input.saleId} volvió a preparación: ${input.reason.trim()}`, link: "/logistica", idempotencyKey: notificationKey("ENTREGA_FALLIDA", `${failed.id}:${failed.eventAt.toISOString()}`, failed.managerId) });
     revalidatePath("/logistica"); return { success: true };
   } catch (error) { return { error: error instanceof Error ? error.message : "No se pudo informar la entrega fallida." }; }
 }

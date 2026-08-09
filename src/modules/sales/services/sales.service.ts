@@ -13,6 +13,8 @@ import { syncPhysicalPackaging } from "@/modules/inventory/services/open-present
 import { validateQuotationConversion } from "@/modules/quotations/domain/quotation-conversion";
 import { evaluateCommercialException } from "@/modules/discounts/domain/commercial-exception";
 import { requestApproval } from "@/modules/approvals/services/approvals.service";
+import { notifyUser } from "@/modules/notifications/services/notification-dispatch.service";
+import { notificationKey } from "@/modules/notifications/domain/events";
 import { validateSaleContract } from "@/modules/sales/domain/sale-validation";
 import { calcularDescuentoAutomatico } from "@/modules/discounts/services/discounts.service";
 import { buildDeliverySnapshot } from "@/modules/sales/domain/delivery";
@@ -277,6 +279,7 @@ export async function procesarVenta(input: VentaInput) {
     revalidatePath("/inventario");
     revalidatePath("/clientes");
     revalidatePath("/presupuestos");
+    await notifyUser({ userId: usuarioId, type: "NUEVO_PEDIDO", title: "Nuevo pedido confirmado", message: `La venta #${ventaProcesada.id} fue confirmada.`, link: "/ventas", idempotencyKey: notificationKey("NUEVO_PEDIDO", ventaProcesada.id, usuarioId) });
     return { success: true, venta: ventaProcesada };
   } catch (error: any) {
     return { error: error.message || "Error al procesar la venta." };

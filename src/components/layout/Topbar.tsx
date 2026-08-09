@@ -1,5 +1,7 @@
 import { Bell, LogOut, Search, Store } from "lucide-react";
+import Link from "next/link";
 import { logoutAction } from "@/modules/auth/actions/auth.actions";
+import { PushSubscriptionControl } from "@/components/pwa/PushSubscriptionControl";
 
 export function Topbar({ userName }: { userName: string }) {
   const initials = userName
@@ -21,15 +23,16 @@ export function Topbar({ userName }: { userName: string }) {
       </div>
 
       <div className="flex items-center gap-6">
+        <PushSubscriptionControl />
         <div className="flex items-center gap-2 text-sm font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
           <Store size={16} />
           <span>Sucursal Central</span>
         </div>
         
-        <button className="text-slate-500 hover:text-slate-900 relative">
+        <Link href="/notificaciones" aria-label="Notificaciones" className="text-slate-500 hover:text-slate-900 relative">
           <Bell size={20} />
           <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-        </button>
+        </Link>
         
         <div title={userName} className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-medium">
           {initials}
