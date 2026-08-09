@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { crearPresupuesto, eliminarPresupuesto } from "@/modules/quotations/actions/quotations.actions";
 import { ManualReservationForm } from "@/modules/reservations/components/ManualReservationForm";
+import { ReservationActions } from "@/modules/reservations/components/ReservationActions";
 
 interface PresupuestoClientProps {
   products: any[];
@@ -332,6 +333,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
                       </td>
                       <td className="px-6 py-4 text-center space-x-1.5">
                         <ManualReservationForm quotation={p} />
+                        {p.reservas?.map((reservation: any) => <ReservationActions key={reservation.id} reservation={reservation} />)}
                         <button
                           onClick={() => handleViewPresupuesto(p)}
                           className="px-2 py-1 text-xs border rounded bg-white text-slate-600 hover:bg-slate-50 font-semibold cursor-pointer"

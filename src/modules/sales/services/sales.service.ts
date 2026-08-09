@@ -17,6 +17,8 @@ export interface DetalleVentaInput {
   loteTono: string | null;
   cantidad: number;
   precioUnitario: number;
+  inventarioId?: number | null;
+  lineaReservaId?: number | null;
 }
 
 export interface VentaInput {
@@ -26,6 +28,8 @@ export interface VentaInput {
   metodoPago: string;
   tipoEntrega?: string; // ENVIO o RETIRO
   detalles: DetalleVentaInput[];
+  reservaId?: number | null;
+  presupuestoId?: number | null;
 }
 
 export async function procesarVenta(input: VentaInput) {
@@ -35,7 +39,7 @@ export async function procesarVenta(input: VentaInput) {
   const operationReference = randomUUID();
 
   try {
-    const { clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles } = input;
+    const { clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles, reservaId, presupuestoId } = input;
     const sucursalId = mainBranch.id;
 
     if (!clienteId || !metodoPago || detalles.length === 0) {
@@ -56,6 +60,8 @@ export async function procesarVenta(input: VentaInput) {
 
       let subtotal = 0;
       const detallesToCreate = [];
+      const reservation = reservaId ? await tx.reservaStock.findUnique({ where: { id: reservaId }, include: { lineas: true } }) : null;
+      if (reservaId && (!reservation || reservation.estado !== "ACTIVA" || (reservation.venceEn && reservation.venceEn <= new Date()))) throw new Error("La reserva está vencida, liberada o ya fue utilizada.");
 
       // 2. Procesar ítems del carrito
       for (const item of detalles) {
@@ -70,16 +76,15 @@ export async function procesarVenta(input: VentaInput) {
         if (!variant) throw new Error(`La variante indicada para "${producto.nombre}" no existe o está inactiva.`);
 
         // Buscar stock en inventario por sucursal y lote/tono
-        const inv = await tx.inventario.findFirst({
-          where: {
+        const inv = item.inventarioId ? await tx.inventario.findFirst({ where: { id: item.inventarioId,
             productoId: item.productoId,
             varianteId: variant.id,
             sucursalId,
-            loteTono: item.loteTono || null,
-          },
-        });
+          } }) : await tx.inventario.findFirst({ where: { productoId: item.productoId, varianteId: variant.id, sucursalId, loteTono: item.loteTono || null } });
 
         const conversion = calculateProductQuantity(producto, item.cantidad);
+        const reservedLine = item.lineaReservaId ? reservation?.lineas.find((line) => line.id === item.lineaReservaId && line.inventarioId === inv?.id && line.estado === "ACTIVA") : null;
+        if (item.lineaReservaId && (!reservedLine || Math.abs(reservedLine.cantidad - conversion.actualQuantity) > 0.000001)) throw new Error("La línea reservada no es válida o su cantidad cambió.");
         const stockActual = inv ? inv.stockActual : 0;
         if (stockActual < conversion.actualQuantity) {
           throw new Error(
@@ -95,8 +100,10 @@ export async function procesarVenta(input: VentaInput) {
             stockActual: {
               decrement: conversion.actualQuantity,
             },
+            ...(reservedLine ? { stockReservado: { decrement: conversion.actualQuantity } } : {}),
           },
         });
+        if (reservedLine) await tx.lineaReservaStock.update({ where: { id: reservedLine.id }, data: { estado: "CONSUMIDA" } });
         await recordInventoryMovement(tx, { inventoryId: inv!.id, variantId: variant.id, userId: usuarioId, type: "VENTA", quantity: -conversion.actualQuantity, baseUnit: variant.unidadBase?.codigo ?? producto.unidadVenta, previousBalance: stockActual, resultingBalance: stockActual - conversion.actualQuantity, reason: `Venta confirmada para cliente ${clienteId}`, referenceType: "VENTA", referenceId: operationReference });
         await syncPhysicalPackaging(tx, { inventoryId: inv!.id, previousStock: stockActual, userId: usuarioId, reason: `Consumo por venta para cliente ${clienteId}`, referenceType: "VENTA", referenceId: operationReference });
         await syncMinimumStockAlert(tx, inv!.id, usuarioId);
@@ -175,6 +182,10 @@ export async function procesarVenta(input: VentaInput) {
           sucursal: true,
         },
       });
+      if (reservation) {
+        const activeLines = await tx.lineaReservaStock.count({ where: { reservaId: reservation.id, estado: "ACTIVA" } });
+        await tx.reservaStock.update({ where: { id: reservation.id }, data: { estado: activeLines === 0 ? "CONSUMIDA" : "PARCIALMENTE_CONSUMIDA" } });
+      }
       await tx.movimientoInventario.updateMany({ where: { referenciaTipo: "VENTA", referenciaId: operationReference, usuarioId }, data: { referenciaId: venta.id.toString() } });
 
       await recordAudit({
@@ -182,7 +193,7 @@ export async function procesarVenta(input: VentaInput) {
         action: "VENTA_CONFIRMADA",
         entity: "Venta",
         entityId: venta.id,
-        after: { clienteId, subtotal, descuento, total, metodoPago, tipoEntrega, detalles },
+        after: { clienteId, subtotal, descuento, total, metodoPago, tipoEntrega, detalles, reservaId, presupuestoId },
       }, tx);
 
       return venta;
@@ -191,6 +202,7 @@ export async function procesarVenta(input: VentaInput) {
     revalidatePath("/ventas");
     revalidatePath("/inventario");
     revalidatePath("/clientes");
+    revalidatePath("/presupuestos");
     return { success: true, venta: ventaProcesada };
   } catch (error: any) {
     return { error: error.message || "Error al procesar la venta." };
