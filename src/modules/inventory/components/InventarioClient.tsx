@@ -194,19 +194,9 @@ export function InventarioClient({ products, categories, sucursales, inventarios
             </select>
           </div>
         ) : (
-          /* Filtro de Sucursal */
-          <div className="flex items-center gap-2 bg-slate-50 border rounded-md px-3 py-1.5">
+          <div className="flex items-center gap-2 bg-slate-50 border rounded-md px-3 py-1.5 text-sm text-slate-700">
             <Store size={16} className="text-slate-400" />
-            <select
-              value={sucursalFilter}
-              onChange={(e) => setSucursalFilter(e.target.value)}
-              className="bg-transparent text-sm border-none outline-none text-slate-700 bg-white"
-            >
-              <option value="all">Todas las Sucursales</option>
-              {sucursales.map((suc) => (
-                <option key={suc.id} value={suc.id}>{suc.nombre}</option>
-              ))}
-            </select>
+            <span>{sucursales[0]?.nombre ?? "Local principal"}</span>
           </div>
         )}
       </div>

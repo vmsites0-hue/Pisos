@@ -166,23 +166,12 @@ export function StockForm({ isOpen, onClose, products, sucursales, preselectedPr
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Sucursal */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Sucursal / Depósito *</label>
-              <select
-                required
-                name="sucursalId"
-                value={sucursalId}
-                onChange={(e) => setSucursalId(parseInt(e.target.value))}
-                className="w-full border rounded-md p-2 text-sm outline-none focus:border-slate-400 bg-white"
-              >
-                <option value={0} disabled>Seleccionar sucursal...</option>
-                {sucursales.map((suc) => (
-                  <option key={suc.id} value={suc.id}>
-                    {suc.nombre}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Local</label>
+              <input type="hidden" name="sucursalId" value={sucursalId} />
+              <div className="w-full rounded-md border bg-slate-50 p-2 text-sm">
+                {sucursales[0]?.nombre ?? "Local principal"}
+              </div>
             </div>
 
             {/* Lote / Tono */}

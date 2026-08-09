@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
+import { getMainBranch } from "@/modules/branches/services/main-branch.service";
+import { getSystemParameterSnapshot } from "@/modules/settings/services/system-parameters.service";
 
 export interface DetallePresupuestoInput {
   productoId: number;
@@ -17,6 +19,8 @@ export interface PresupuestoInput {
 
 export async function crearPresupuesto(input: PresupuestoInput) {
   await requirePermission(PERMISSIONS.QUOTATIONS_MANAGE);
+  const mainBranch = await getMainBranch();
+  const configurationSnapshot = await getSystemParameterSnapshot();
   try {
     const { clienteId, descuento, detalles } = input;
 
@@ -63,11 +67,13 @@ export async function crearPresupuesto(input: PresupuestoInput) {
     // 3. Crear el Presupuesto y Detalles
     const presupuesto = await prisma.presupuesto.create({
       data: {
+        sucursalId: mainBranch.id,
         clienteId,
         subtotal,
         descuento,
         total,
-        validezDias: 15, // Por defecto 15 días de validez
+        validezDias: Number(configurationSnapshot.PRESUPUESTO_VALIDEZ_DIAS ?? 15),
+        configuracionSnapshot: JSON.stringify(configurationSnapshot),
         detalles: {
           create: detallesToCreate,
         },

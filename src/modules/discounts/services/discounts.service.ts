@@ -3,17 +3,20 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { requireAuthenticatedUser } from "@/modules/auth/services/session.service";
+import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 
 export async function getReglasDescuento() {
   await requireAuthenticatedUser();
+  const mainBranch = await getMainBranch();
   return await prisma.reglaDescuento.findMany({
-    where: { activa: true },
+    where: { activa: true, sucursalId: mainBranch.id },
     orderBy: { creadoEn: "desc" },
   });
 }
 
 export async function createReglaDescuento(formData: FormData) {
   await requirePermission(PERMISSIONS.DISCOUNTS_MANAGE);
+  const mainBranch = await getMainBranch();
   const nombre = formData.get("nombre") as string;
   const tipo = formData.get("tipo") as string;
   const categoriaIdStr = formData.get("categoriaId") as string;
@@ -27,6 +30,7 @@ export async function createReglaDescuento(formData: FormData) {
   try {
     const regla = await prisma.reglaDescuento.create({
       data: {
+        sucursalId: mainBranch.id,
         nombre,
         tipo,
         categoriaId: categoriaIdStr ? parseInt(categoriaIdStr) : null,
@@ -81,8 +85,9 @@ export interface CartItemForDiscount {
 
 export async function calcularDescuentoAutomatico(items: CartItemForDiscount[]) {
   await requireAuthenticatedUser();
+  const mainBranch = await getMainBranch();
   const reglas = await prisma.reglaDescuento.findMany({
-    where: { activa: true },
+    where: { activa: true, sucursalId: mainBranch.id },
   });
 
   if (reglas.length === 0 || items.length === 0) {

@@ -15,12 +15,12 @@ model Usuario {
   nombre      String
   email       String    @unique
   password    String    // Hashed
-  sucursalId  Int?
+  sucursalId  Int
   activo      Boolean   @default(true)
   creadoEn    DateTime  @default(now())
   actualizado DateTime  @updatedAt
 
-  sucursal    Sucursal? @relation(fields: [sucursalId], references: [id])
+  sucursal    Sucursal  @relation(fields: [sucursalId], references: [id])
   ventas      Venta[]
   sesiones    Sesion[]
   roles       UsuarioRol[]
@@ -103,6 +103,16 @@ model PoliticaAprobacion {
   permitirAutoAprobacion   Boolean @default(false)
 }
 
+model ParametroSistema {
+  clave               String   @id
+  tipo                String
+  valor               String
+  valorPredeterminado String
+  descripcion         String
+  validacion          String
+  actualizadoEn       DateTime @updatedAt
+}
+
 model RegistroAuditoria {
   id            Int       @id @default(autoincrement())
   usuarioId     Int?
@@ -130,11 +140,16 @@ model Sucursal {
   direccion   String?
   telefono    String?
   activa      Boolean   @default(true)
+  esPrincipal Boolean   @default(false)
   creadoEn    DateTime  @default(now())
 
   usuarios    Usuario[]
   inventarios Inventario[]
   ventas      Venta[]
+  clientes    Cliente[]
+  presupuestos Presupuesto[]
+  gastos      Gasto[]
+  reglasDescuento ReglaDescuento[]
 }
 
 // ==========================================
@@ -201,6 +216,7 @@ model Inventario {
 
 model Cliente {
   id             Int           @id @default(autoincrement())
+  sucursalId     Int
   nombre         String
   apellido       String
   documento      String        @unique // CI o DNI
@@ -217,6 +233,9 @@ model Cliente {
 
   ventas         Venta[]
   presupuestos   Presupuesto[]
+  sucursal       Sucursal      @relation(fields: [sucursalId], references: [id])
+
+  @@index([sucursalId])
 }
 
 // ==========================================
@@ -239,6 +258,7 @@ model Venta {
   tipoEntrega    String        @default("ENVIO") // ENVIO o RETIRO
   chofer         String?       // Chofer asignado para envíos
   observaciones  String?       // Notas de observación para el despacho
+  configuracionSnapshot String  @default("{}")
 
   sucursal       Sucursal      @relation(fields: [sucursalId], references: [id])
   usuario        Usuario       @relation(fields: [usuarioId], references: [id])
@@ -265,15 +285,20 @@ model DetalleVenta {
 
 model Presupuesto {
   id             Int                  @id @default(autoincrement())
+  sucursalId     Int
   clienteId      Int
   fecha          DateTime             @default(now())
   subtotal       Float
   descuento      Float                @default(0)
   total          Float
   validezDias    Int                  @default(15)
+  configuracionSnapshot String        @default("{}")
   
   cliente        Cliente              @relation(fields: [clienteId], references: [id])
+  sucursal       Sucursal             @relation(fields: [sucursalId], references: [id])
   detalles       DetallePresupuesto[]
+
+  @@index([sucursalId])
 }
 
 model DetallePresupuesto {
@@ -295,10 +320,14 @@ model DetallePresupuesto {
 
 model Gasto {
   id          Int      @id @default(autoincrement())
+  sucursalId  Int
   descripcion String
   monto       Float
   categoria   String?
   fecha       DateTime @default(now())
+  sucursal    Sucursal @relation(fields: [sucursalId], references: [id])
+
+  @@index([sucursalId])
 }
 
 // ==========================================
@@ -307,6 +336,7 @@ model Gasto {
 
 model ReglaDescuento {
   id                 Int      @id @default(autoincrement())
+  sucursalId         Int
   nombre             String
   tipo               String   // POR_VOLUMEN, POR_CATEGORIA, POR_MONTO
   categoriaId        Int?     // Si aplica solo a una categoría
@@ -314,4 +344,7 @@ model ReglaDescuento {
   porcentajeDescuento Float   // Ej: 5 (= 5%)
   activa             Boolean  @default(true)
   creadoEn           DateTime @default(now())
+  sucursal            Sucursal @relation(fields: [sucursalId], references: [id])
+
+  @@index([sucursalId])
 }
