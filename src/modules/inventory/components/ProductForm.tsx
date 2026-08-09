@@ -10,12 +10,14 @@ interface ProductFormProps {
   onClose: () => void;
   product?: any; // Si existe, es edición. Si no, creación.
   categories: { id: number; nombre: string; familia?: { atributos: { id: number; nombre: string; tipo: string; obligatorio: boolean; opciones: string | null }[] } | null }[];
+  units: { id: number; codigo: string; nombre: string; simbolo: string; precision: number; admiteDecimales: boolean }[];
 }
 
-export function ProductForm({ isOpen, onClose, product, categories }: ProductFormProps) {
+export function ProductForm({ isOpen, onClose, product, categories, units }: ProductFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unidadVenta, setUnidadVenta] = useState("UNIDAD");
+  const [unidadBaseId, setUnidadBaseId] = useState("");
   const [permiteFraccion, setPermiteFraccion] = useState(false);
   
   // Categoría seleccionada e inline
@@ -28,17 +30,19 @@ export function ProductForm({ isOpen, onClose, product, categories }: ProductFor
   useEffect(() => {
     if (product) {
       setUnidadVenta(product.unidadVenta || "UNIDAD");
+      setUnidadBaseId(product.variantes?.[0]?.unidadBaseId?.toString() || units.find((unit) => unit.codigo === product.unidadVenta)?.id.toString() || "");
       setPermiteFraccion(product.permiteFraccion || false);
       setSelectedCategory(product.categoriaId?.toString() || "");
     } else {
       setUnidadVenta("UNIDAD");
+      setUnidadBaseId(units.find((unit) => unit.codigo === "UNIDAD")?.id.toString() || units[0]?.id.toString() || "");
       setPermiteFraccion(false);
       setSelectedCategory("");
     }
     setShowInlineCat(false);
     setNewCatName("");
     setCatError(null);
-  }, [product, isOpen]);
+  }, [product, isOpen, units]);
 
   async function handleAddCategoryInline(e: React.MouseEvent) {
     e.preventDefault();
@@ -85,6 +89,8 @@ export function ProductForm({ isOpen, onClose, product, categories }: ProductFor
   }
 
   const isM2OrCaja = unidadVenta === "M2" || unidadVenta === "CAJA";
+  const primaryVariant = product?.variantes?.[0];
+  const extraPresentation = primaryVariant?.presentaciones?.find((item: any) => !item.predeterminada);
   const selectedAttributes = categories.find((category) => category.id.toString() === selectedCategory)?.familia?.atributos ?? [];
   const currentValues = new Map<number, string>((product?.variantes?.[0]?.valores ?? []).map((item: any) => [item.atributoId, item.valor]));
 
@@ -281,21 +287,19 @@ export function ProductForm({ isOpen, onClose, product, categories }: ProductFor
               <label className="block text-sm font-medium text-slate-700 mb-1">Unidad de Venta *</label>
               <select
                 required
-                name="unidadVenta"
-                value={unidadVenta}
-                onChange={(e) => setUnidadVenta(e.target.value)}
+                name="unidadBaseId"
+                value={unidadBaseId}
+                onChange={(e) => { setUnidadBaseId(e.target.value); setUnidadVenta(units.find((unit) => unit.id.toString() === e.target.value)?.codigo ?? "UNIDAD"); }}
                 className="w-full border rounded-md p-2 text-sm outline-none focus:border-slate-400 bg-white"
               >
-                <option value="UNIDAD">Unidad (Un)</option>
-                <option value="M2">Metro Cuadrado (m²)</option>
-                <option value="CAJA">Caja (Cj)</option>
+                {units.map((unit) => <option key={unit.id} value={unit.id}>{unit.nombre} ({unit.simbolo})</option>)}
               </select>
             </div>
 
             {/* m2 por caja */}
             <div>
               <label className={`block text-sm font-medium text-slate-700 mb-1 ${!isM2OrCaja && "opacity-50"}`}>
-                m² por Caja
+                Factor de presentación
               </label>
               <input
                 required={isM2OrCaja}
@@ -304,8 +308,8 @@ export function ProductForm({ isOpen, onClose, product, categories }: ProductFor
                 type="number"
                 step="0.001"
                 min="0.001"
-                defaultValue={product?.m2PorCaja || ""}
-                placeholder={isM2OrCaja ? "Ej. 1.44" : "No aplica"}
+                defaultValue={extraPresentation?.factorConversion || product?.m2PorCaja || ""}
+                placeholder={isM2OrCaja ? "Ej. 2.08" : "No aplica"}
                 className={`w-full border rounded-md p-2 text-sm outline-none focus:border-slate-400 ${
                   !isM2OrCaja && "bg-slate-50 cursor-not-allowed"
                 }`}
@@ -328,6 +332,20 @@ export function ProductForm({ isOpen, onClose, product, categories }: ProductFor
               </label>
             </div>
           )}
+
+          <div className="grid grid-cols-1 gap-4 rounded-lg border p-3 md:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Política de venta</label>
+              <select key={primaryVariant?.politicaVenta || unidadVenta} name="politicaVenta" defaultValue={primaryVariant?.politicaVenta || (unidadVenta === "M2" ? "SOLO_CAJAS_COMPLETAS" : "UNIDADES_ENTERAS")} className="w-full rounded-md border bg-white p-2 text-sm">
+                <option value="SOLO_CAJAS_COMPLETAS">Solo cajas completas</option><option value="CANTIDAD_EXACTA">Cantidad exacta</option><option value="CAJAS_Y_FRACCION">Cajas y fracción</option><option value="UNIDADES_ENTERAS">Unidades enteras</option><option value="MULTIPLO_CONFIGURABLE">Múltiplo configurable</option>
+              </select>
+            </div>
+            <div><label className="mb-1 block text-sm font-medium text-slate-700">Múltiplo de venta</label><input name="multiploVenta" type="number" min="0.001" step="0.001" defaultValue={primaryVariant?.multiploVenta || ""} className="w-full rounded-md border p-2 text-sm" /></div>
+            <div><label className="mb-1 block text-sm font-medium text-slate-700">Nombre presentación</label><input name="nombrePresentacion" defaultValue={extraPresentation?.nombre || (isM2OrCaja ? "Caja" : "")} placeholder="Caja, pallet, juego…" className="w-full rounded-md border p-2 text-sm" /></div>
+            <div><label className="mb-1 block text-sm font-medium text-slate-700">Unidad presentación</label><select name="unidadPresentacionId" defaultValue={extraPresentation?.unidadId || units.find((unit) => unit.codigo === "CAJA")?.id || ""} className="w-full rounded-md border bg-white p-2 text-sm"><option value="">No aplica</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.nombre}</option>)}</select></div>
+            <div><label className="mb-1 block text-sm font-medium text-slate-700">Piezas</label><input name="piezasPresentacion" type="number" min="1" step="1" defaultValue={extraPresentation?.piezas || ""} className="w-full rounded-md border p-2 text-sm" /></div>
+            <div><label className="mb-1 block text-sm font-medium text-slate-700">Descripción presentación</label><input name="descripcionPresentacion" defaultValue={extraPresentation?.descripcion || ""} className="w-full rounded-md border p-2 text-sm" /></div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
             {/* Precio Compra */}

@@ -258,11 +258,47 @@ model VarianteProducto {
   activa          Boolean  @default(true)
   creadoEn        DateTime @default(now())
   actualizado     DateTime @updatedAt
+  unidadBaseId    Int?
+  politicaVenta   String   @default("UNIDADES_ENTERAS")
+  multiploVenta   Float?
 
   producto Producto                @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  unidadBase UnidadMedida?         @relation("UnidadBaseVariante", fields: [unidadBaseId], references: [id])
   valores  VarianteAtributoValor[]
+  presentaciones PresentacionVariante[]
 
   @@index([productoId])
+}
+
+model UnidadMedida {
+  id               Int     @id @default(autoincrement())
+  codigo           String  @unique
+  nombre           String
+  simbolo          String
+  precision        Int     @default(2)
+  admiteDecimales  Boolean @default(true)
+  activa           Boolean @default(true)
+
+  variantesBase VarianteProducto[]    @relation("UnidadBaseVariante")
+  presentaciones PresentacionVariante[]
+}
+
+model PresentacionVariante {
+  id               Int      @id @default(autoincrement())
+  varianteId       Int
+  unidadId         Int
+  nombre           String
+  factorConversion Float
+  piezas           Int?
+  descripcion      String?
+  predeterminada   Boolean  @default(false)
+  activa           Boolean  @default(true)
+
+  variante VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
+  unidad UnidadMedida       @relation(fields: [unidadId], references: [id])
+
+  @@unique([varianteId, nombre])
+  @@index([unidadId])
 }
 
 model VarianteAtributoValor {
