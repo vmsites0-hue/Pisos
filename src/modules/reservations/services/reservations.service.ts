@@ -7,6 +7,8 @@ import { recordInventoryMovement } from "@/modules/inventory/services/inventory-
 import { syncMinimumStockAlert } from "@/modules/inventory/services/minimum-stock.service";
 import { recordAudit } from "@/modules/audit/services/audit.service";
 import { resolveReservationExpiration } from "@/modules/reservations/domain/expiration";
+import { canReleaseReservation } from "@/modules/reservations/domain/reservation-state";
+import { procesarVenta } from "@/modules/sales/services/sales.service";
 
 export async function createManualReservation(input: { quotationId: number; lines: Array<{ quotationLineId: number; quantity: number }>; expirationMode: "NONE" | "DEFAULT" | "CUSTOM"; customExpiration?: string | null }) {
   const user = await requirePermission(PERMISSIONS.RESERVATIONS_MANAGE);
@@ -38,4 +40,30 @@ export async function createManualReservation(input: { quotationId: number; line
   });
   revalidatePath("/presupuestos"); revalidatePath("/inventario");
   return reservation;
+}
+
+export async function releaseReservation(id: number, reason: string) {
+  const user = await requirePermission(PERMISSIONS.RESERVATIONS_MANAGE);
+  if (!reason.trim()) throw new Error("El motivo de liberación es obligatorio.");
+  await prisma.$transaction(async (tx) => {
+    const reservation = await tx.reservaStock.findUniqueOrThrow({ where: { id }, include: { lineas: { where: { estado: "ACTIVA" }, include: { inventario: { include: { variante: { include: { unidadBase: true } } } } } } } });
+    if (!canReleaseReservation(reservation.estado)) throw new Error("La reserva ya fue liberada, vencida o consumida.");
+    const claimed = await tx.reservaStock.updateMany({ where: { id, estado: { in: ["ACTIVA", "PARCIALMENTE_CONSUMIDA"] } }, data: { estado: "LIBERADA", liberadaEn: new Date(), motivoLiberacion: reason.trim() } });
+    if (claimed.count !== 1) throw new Error("La reserva fue modificada por otra operación.");
+    for (const line of reservation.lineas) {
+      await tx.inventario.update({ where: { id: line.inventarioId }, data: { stockReservado: { decrement: line.cantidad } } });
+      await tx.lineaReservaStock.update({ where: { id: line.id }, data: { estado: "LIBERADA" } });
+      await recordInventoryMovement(tx, { inventoryId: line.inventarioId, variantId: line.inventario.varianteId, userId: user.id, type: "LIBERACION", quantity: line.cantidad, baseUnit: line.inventario.variante?.unidadBase?.codigo ?? "UNIDAD", previousBalance: line.inventario.stockActual, resultingBalance: line.inventario.stockActual, reason: reason.trim(), referenceType: "RESERVA", referenceId: id.toString() });
+      await syncMinimumStockAlert(tx, line.inventarioId, user.id);
+    }
+    await recordAudit({ userId: user.id, action: "RESERVA_LIBERADA", entity: "ReservaStock", entityId: id, after: { estado: "LIBERADA", motivo: reason.trim() } }, tx);
+  });
+  revalidatePath("/presupuestos"); revalidatePath("/inventario");
+}
+
+export async function convertReservationToSale(input: { reservationId: number; paymentMethod: string; deliveryType: string }) {
+  const reservation = await prisma.reservaStock.findUnique({ where: { id: input.reservationId }, include: { presupuesto: { include: { detalles: true } }, lineas: { where: { estado: "ACTIVA" }, include: { detallePresupuesto: true, inventario: true } } } });
+  if (!reservation || reservation.estado !== "ACTIVA" || (reservation.venceEn && reservation.venceEn <= new Date())) return { error: "La reserva está vencida, liberada o ya fue utilizada." };
+  if (!reservation.lineas.length) return { error: "La reserva no tiene líneas activas." };
+  return procesarVenta({ clienteId: reservation.presupuesto.clienteId, descuento: 0, metodoPago: input.paymentMethod, tipoEntrega: input.deliveryType, reservaId: reservation.id, presupuestoId: reservation.presupuestoId, sucursalId: reservation.presupuesto.sucursalId, detalles: reservation.lineas.map((line) => ({ productoId: line.detallePresupuesto.productoId, varianteId: line.inventario.varianteId, inventarioId: line.inventarioId, lineaReservaId: line.id, loteTono: line.inventario.loteTono, cantidad: line.cantidad, precioUnitario: line.detallePresupuesto.precioUnitario })) });
 }
