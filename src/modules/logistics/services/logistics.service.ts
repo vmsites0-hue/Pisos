@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { recordAudit } from "@/modules/audit/services/audit.service";
+import { validateDeliveryTransition } from "@/modules/logistics/domain/delivery-state";
 
 export async function actualizarEstadoEnvio(
   ventaId: number, 
@@ -12,28 +13,16 @@ export async function actualizarEstadoEnvio(
 ) {
   const user = await requirePermission(PERMISSIONS.LOGISTICS_UPDATE);
   try {
-    const validStates = ["PENDIENTE", "ENCARGADO", "DESPACHADO", "ENTREGADO"];
-    if (!validStates.includes(nuevoEstado)) {
-      return { error: "Estado de entrega inválido." };
-    }
-
-    const updateData: any = {
-      estado: nuevoEstado,
-    };
-
-    if (chofer !== undefined) {
-      updateData.chofer = chofer;
-    }
-    if (observaciones !== undefined) {
-      updateData.observaciones = observaciones;
-    }
-
-    const before = await prisma.venta.findUniqueOrThrow({ where: { id: ventaId } });
-    const updated = await prisma.venta.update({
-      where: { id: ventaId },
-      data: updateData,
+    const updated = await prisma.$transaction(async (tx) => {
+      const delivery = await tx.entrega.findUnique({ where: { ventaId } });
+      if (!delivery) throw new Error("La venta no tiene una entrega domiciliaria.");
+      validateDeliveryTransition(delivery.estado, nuevoEstado);
+      const result = await tx.entrega.update({ where: { id: delivery.id }, data: { estado: nuevoEstado, ...(observaciones !== undefined ? { observaciones } : {}) } });
+      await tx.eventoEntrega.create({ data: { entregaId: delivery.id, usuarioId: user.id, estadoAnterior: delivery.estado, estadoNuevo: nuevoEstado, observacion: observaciones?.trim() || null } });
+      await tx.venta.update({ where: { id: ventaId }, data: { estado: nuevoEstado, ...(chofer !== undefined ? { chofer } : {}), ...(observaciones !== undefined ? { observaciones } : {}) } });
+      await recordAudit({ userId: user.id, action: "ENTREGA_TRANSICION", entity: "Entrega", entityId: delivery.id, before: { estado: delivery.estado }, after: { estado: nuevoEstado, observaciones } }, tx);
+      return result;
     });
-    await recordAudit({ userId: user.id, action: "ENTREGA_ACTUALIZADA", entity: "Venta", entityId: ventaId, before, after: updated });
 
     revalidatePath("/logistica");
     revalidatePath("/");

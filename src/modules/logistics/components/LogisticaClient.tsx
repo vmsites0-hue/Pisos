@@ -22,13 +22,13 @@ interface LogisticaClientProps {
 }
 
 export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
-  const [activeTab, setActiveTab] = useState<"PENDIENTE" | "ENCARGADO" | "DESPACHADO" | "ENTREGADO">("PENDIENTE");
+  const [activeTab, setActiveTab] = useState<"PENDIENTE" | "EN_PREPARACION" | "LISTO_DESPACHO" | "EN_CAMINO" | "ENTREGADO" | "ENTREGA_FALLIDA" | "CANCELADO">("PENDIENTE");
   const [searchQuery, setSearchQuery] = useState("");
   const [sucursalFilter, setSucursalFilter] = useState("all");
   
   // Modales de transición
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<"ENCARGADO" | "DESPACHADO" | "ENTREGADO">("ENCARGADO");
+  const [modalType, setModalType] = useState<"EN_PREPARACION" | "LISTO_DESPACHO" | "EN_CAMINO" | "ENTREGADO">("EN_PREPARACION");
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
   
   // Inputs del modal
@@ -54,7 +54,7 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
     return matchesTab && matchesBranch && matchesSearch;
   });
 
-  const openTransitionModal = (saleId: number, type: "ENCARGADO" | "DESPACHADO" | "ENTREGADO") => {
+  const openTransitionModal = (saleId: number, type: "EN_PREPARACION" | "LISTO_DESPACHO" | "EN_CAMINO" | "ENTREGADO") => {
     setSelectedSaleId(saleId);
     setModalType(type);
     setChofer("");
@@ -71,14 +71,14 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
     let finalObservacion = observaciones.trim();
 
     // Si pasamos a encargado, guardamos el encargado en la nota
-    if (modalType === "ENCARGADO") {
+    if (modalType === "EN_PREPARACION") {
       finalObservacion = `[Preparado por: ${encargado.trim()}] ${finalObservacion}`;
     }
 
     const res = await actualizarEstadoEnvio(
       selectedSaleId, 
       modalType, 
-      modalType === "DESPACHADO" ? chofer.trim() : undefined,
+      modalType === "EN_CAMINO" ? chofer.trim() : undefined,
       finalObservacion ? finalObservacion : undefined
     );
     
@@ -111,24 +111,30 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
           Pendiente ({sales.filter(s => s.estado === "PENDIENTE").length})
         </button>
         <button
-          onClick={() => setActiveTab("ENCARGADO")}
+          onClick={() => setActiveTab("EN_PREPARACION")}
           className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
-            activeTab === "ENCARGADO"
+            activeTab === "EN_PREPARACION"
               ? "border-slate-900 text-slate-900"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
-          Encargado / Preparación ({sales.filter(s => s.estado === "ENCARGADO").length})
+          En preparación ({sales.filter(s => s.estado === "EN_PREPARACION").length})
         </button>
         <button
-          onClick={() => setActiveTab("DESPACHADO")}
+          onClick={() => setActiveTab("LISTO_DESPACHO")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${activeTab === "LISTO_DESPACHO" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-900"}`}
+        >
+          Listo ({sales.filter(s => s.estado === "LISTO_DESPACHO").length})
+        </button>
+        <button
+          onClick={() => setActiveTab("EN_CAMINO")}
           className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
-            activeTab === "DESPACHADO"
+            activeTab === "EN_CAMINO"
               ? "border-slate-900 text-slate-900"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
-          En Camino ({sales.filter(s => s.estado === "DESPACHADO").length})
+          En Camino ({sales.filter(s => s.estado === "EN_CAMINO").length})
         </button>
         <button
           onClick={() => setActiveTab("ENTREGADO")}
@@ -199,17 +205,17 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
                   <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                     sale.estado === "PENDIENTE"
                       ? "bg-amber-50 text-amber-700 border border-amber-200"
-                      : sale.estado === "ENCARGADO"
+                      : sale.estado === "EN_PREPARACION"
                       ? "bg-purple-50 text-purple-700 border border-purple-200"
-                      : sale.estado === "DESPACHADO"
+                      : sale.estado === "EN_CAMINO"
                       ? "bg-blue-50 text-blue-700 border border-blue-200"
                       : "bg-emerald-50 text-emerald-700 border border-emerald-200"
                   }`}>
                     {sale.estado === "PENDIENTE" 
                       ? "Pendiente" 
-                      : sale.estado === "ENCARGADO" 
+                      : sale.estado === "EN_PREPARACION"
                       ? "Encargado (Preparando)" 
-                      : sale.estado === "DESPACHADO" 
+                      : sale.estado === "EN_CAMINO"
                       ? "En camino" 
                       : "Entregado"}
                   </span>
@@ -217,7 +223,7 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
                   {/* Acciones */}
                   {sale.estado === "PENDIENTE" && (
                     <button
-                      onClick={() => openTransitionModal(sale.id, "ENCARGADO")}
+                      onClick={() => openTransitionModal(sale.id, "EN_PREPARACION")}
                       className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <ClipboardList size={14} />
@@ -225,24 +231,27 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
                     </button>
                   )}
 
-                  {sale.estado === "ENCARGADO" && (
+                  {sale.estado === "EN_PREPARACION" && (
                     <button
-                      onClick={() => openTransitionModal(sale.id, "DESPACHADO")}
+                      onClick={() => openTransitionModal(sale.id, "LISTO_DESPACHO")}
                       className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Truck size={14} />
-                      <span>Despachar (En Camino)</span>
+                      <span>Listo para despacho</span>
                     </button>
                   )}
 
-                  {sale.estado === "DESPACHADO" && (
+                  {sale.estado === "LISTO_DESPACHO" && (
                     <button
-                      onClick={() => openTransitionModal(sale.id, "ENTREGADO")}
+                      onClick={() => openTransitionModal(sale.id, "EN_CAMINO")}
                       className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Check size={14} />
-                      <span>Confirmar Entrega</span>
+                      <span>Iniciar recorrido</span>
                     </button>
+                  )}
+                  {sale.estado === "EN_CAMINO" && (
+                    <button onClick={() => openTransitionModal(sale.id, "ENTREGADO")} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1.5"><Check size={14} /><span>Confirmar entrega</span></button>
                   )}
                 </div>
               </div>
@@ -309,8 +318,9 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
               <h3 className="text-lg font-bold flex items-center gap-2">
                 <Truck className="text-slate-500" size={18} />
                 <span>
-                  {modalType === "ENCARGADO" && "Asignar Encargado"}
-                  {modalType === "DESPACHADO" && "Confirmar Despacho (En camino)"}
+                  {modalType === "EN_PREPARACION" && "Iniciar preparación"}
+                  {modalType === "LISTO_DESPACHO" && "Marcar listo para despacho"}
+                  {modalType === "EN_CAMINO" && "Confirmar despacho (en camino)"}
                   {modalType === "ENTREGADO" && "Confirmar Entrega Final"}
                 </span>
               </h3>
@@ -320,7 +330,7 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
             </div>
 
             <form onSubmit={handleConfirmarTransicion} className="space-y-4">
-              {modalType === "ENCARGADO" && (
+              {modalType === "EN_PREPARACION" && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Encargado de Preparación *</label>
                   <input
@@ -334,7 +344,7 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
                 </div>
               )}
 
-              {modalType === "DESPACHADO" && (
+              {modalType === "EN_CAMINO" && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Nombre del Chofer / Repartidor *</label>
                   <input
