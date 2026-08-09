@@ -339,6 +339,14 @@ export function ConfiguracionClient({ sucursales, reglas, categories }: Configur
                   ))}
                 </select>
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input name="familiaId" type="number" min="1" placeholder="ID familia (opcional)" className="rounded-md border p-2 text-sm" />
+                <input name="marcaId" type="number" min="1" placeholder="ID marca (opcional)" className="rounded-md border p-2 text-sm" />
+                <input name="productoId" type="number" min="1" placeholder="ID producto (opcional)" className="rounded-md border p-2 text-sm" />
+                <input name="varianteId" type="number" min="1" placeholder="ID variante (opcional)" className="rounded-md border p-2 text-sm" />
+                <input name="clienteId" type="number" min="1" placeholder="ID cliente (opcional)" className="rounded-md border p-2 text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-2"><label className="text-xs text-slate-600">Vigente desde<input name="vigenteDesde" type="datetime-local" className="mt-1 w-full rounded-md border p-2 text-sm" /></label><label className="text-xs text-slate-600">Vigente hasta<input name="vigenteHasta" type="datetime-local" className="mt-1 w-full rounded-md border p-2 text-sm" /></label></div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Umbral mínimo *</label>
                 <input name="umbralMinimo" type="number" step="0.01" required placeholder="Ej: 20 (m²) o 500000 (Gs.)" className="w-full border rounded-md p-2 text-sm outline-none focus:border-slate-400" />

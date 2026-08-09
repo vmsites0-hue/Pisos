@@ -40,8 +40,11 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
   const [descuentoManual, setDescuentoManual] = useState<number>(0);
   const [descuentoAuto, setDescuentoAuto] = useState<number>(0);
   const [reglaAplicada, setReglaAplicada] = useState<string | null>(null);
+  const [reglaAplicadaId, setReglaAplicadaId] = useState<number | null>(null);
   const [metodoPago, setMetodoPago] = useState<string>("EFECTIVO");
   const [tipoEntrega, setTipoEntrega] = useState<string>("ENVIO");
+  const [approvalId, setApprovalId] = useState("");
+  const [exceptionReason, setExceptionReason] = useState("");
 
   // Filtros de búsqueda para catálogo
   const [searchQuery, setSearchQuery] = useState("");
@@ -110,23 +113,28 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
       if (cart.length === 0) {
         setDescuentoAuto(0);
         setReglaAplicada(null);
+        setReglaAplicadaId(null);
         setDescuento(descuentoManual);
         return;
       }
       const items = cart.map(item => ({
         productoId: item.productoId,
         categoriaId: products.find(p => p.id === item.productoId)?.categoriaId || 0,
+        familiaId: products.find(p => p.id === item.productoId)?.familiaId,
+        marcaId: products.find(p => p.id === item.productoId)?.marcaId,
+        varianteId: item.varianteId,
         cantidad: item.cantidad,
         precioUnitario: item.precioVenta,
         subtotal: item.cantidad * item.precioVenta,
       }));
-      const resultado = await calcularDescuentoAutomatico(items);
+      const resultado = await calcularDescuentoAutomatico(items, clienteId || null);
       setDescuentoAuto(resultado.monto);
       setReglaAplicada(resultado.reglaAplicada);
+      setReglaAplicadaId(resultado.reglaAplicadaId);
       setDescuento(resultado.monto + descuentoManual);
     }
     evalDescuento();
-  }, [cart, descuentoManual, products]);
+  }, [cart, descuentoManual, products, clienteId]);
 
   const selectedSucursal = sucursales.find(s => s.id === sucursalId);
   const selectedCliente = clientes.find(c => c.id === clienteId);
@@ -196,6 +204,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
           unidadVenta: inv.producto.unidadVenta,
           m2PorCaja: inv.producto.m2PorCaja,
           precioVenta: inv.producto.precioVenta,
+          precioOriginal: inv.producto.precioVenta,
           stockActual: inv.stockActual,
           stockReservado: inv.stockReservado,
           categoriaId: inv.producto.categoriaId,
@@ -319,6 +328,10 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
       sucursalId,
       clienteId,
       descuento,
+      reglaDescuentoId: reglaAplicadaId,
+      descuentoAutomatico: descuentoAuto,
+      approvalId: approvalId ? Number(approvalId) : null,
+      exceptionReason,
       metodoPago,
       tipoEntrega,
       detalles: cart.map(item => ({
@@ -541,7 +554,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
                         )}
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-xs">{formatMoney(item.precioVenta)}</div>
+                        <input aria-label={`Precio de ${item.nombre}`} type="number" min="0" value={item.precioVenta} onChange={(event) => setCart(cart.map((entry, entryIndex) => entryIndex === index ? { ...entry, precioVenta: Number(event.target.value) } : entry))} className="w-28 rounded border px-1 text-right text-xs font-bold" />
                         <div className="text-[10px] text-slate-400">Total: {formatMoney(item.cantidad * item.precioVenta)}</div>
                       </div>
                     </div>
@@ -676,6 +689,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
                 </button>
               </div>
             </div>
+            {(descuentoManual > 0 || cart.some((item) => item.precioOriginal && item.precioOriginal !== item.precioVenta)) && <div className="col-span-2 grid grid-cols-2 gap-2 rounded border bg-amber-50 p-2"><input value={exceptionReason} onChange={(event) => setExceptionReason(event.target.value)} placeholder="Motivo de la excepción" className="rounded border p-1.5 text-xs" /><input value={approvalId} onChange={(event) => setApprovalId(event.target.value)} type="number" min="1" placeholder="ID aprobación (si corresponde)" className="rounded border p-1.5 text-xs" /></div>}
           </div>
 
           {/* Descuento Automático Aplicado */}

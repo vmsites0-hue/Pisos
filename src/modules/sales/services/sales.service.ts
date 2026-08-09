@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/modules/auth/services/access.service";
+import { hasPermission, requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { recordAudit } from "@/modules/audit/services/audit.service";
 import { getMainBranch } from "@/modules/branches/services/main-branch.service";
@@ -11,6 +11,8 @@ import { randomUUID } from "node:crypto";
 import { syncMinimumStockAlert } from "@/modules/inventory/services/minimum-stock.service";
 import { syncPhysicalPackaging } from "@/modules/inventory/services/open-presentations.service";
 import { validateQuotationConversion } from "@/modules/quotations/domain/quotation-conversion";
+import { evaluateCommercialException } from "@/modules/discounts/domain/commercial-exception";
+import { requestApproval } from "@/modules/approvals/services/approvals.service";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -20,6 +22,7 @@ export interface DetalleVentaInput {
   precioUnitario: number;
   inventarioId?: number | null;
   lineaReservaId?: number | null;
+  precioOriginal?: number;
 }
 
 export interface VentaInput {
@@ -31,6 +34,10 @@ export interface VentaInput {
   detalles: DetalleVentaInput[];
   reservaId?: number | null;
   presupuestoId?: number | null;
+  reglaDescuentoId?: number | null;
+  descuentoAutomatico?: number;
+  approvalId?: number | null;
+  exceptionReason?: string;
 }
 
 export async function procesarVenta(input: VentaInput) {
@@ -40,8 +47,27 @@ export async function procesarVenta(input: VentaInput) {
   const operationReference = randomUUID();
 
   try {
-    const { clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles, reservaId, presupuestoId } = input;
+    const { clienteId, descuento, metodoPago, tipoEntrega = "ENVIO", detalles, reservaId, presupuestoId, reglaDescuentoId, descuentoAutomatico = 0 } = input;
     const sucursalId = mainBranch.id;
+
+    const referencePrices = await Promise.all(detalles.map(async (item) => {
+      const variant = await prisma.varianteProducto.findFirst({ where: { productoId: item.productoId, activa: true, ...(item.varianteId ? { id: item.varianteId } : {}) }, orderBy: { id: "asc" } });
+      return { ...item, precioOriginal: variant?.precioVenta ?? item.precioUnitario };
+    }));
+    const estimatedSubtotal = referencePrices.reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
+    const manualDiscount = Math.max(0, descuento - descuentoAutomatico);
+    const limit = Number(configurationSnapshot.DESCUENTO_MANUAL_LIMITE_PORCENTAJE ?? 5);
+    const canManageDiscounts = await hasPermission(PERMISSIONS.DISCOUNTS_MANAGE);
+    const exception = evaluateCommercialException({ subtotal: estimatedSubtotal, manualDiscount, discountLimitPercent: limit, hasDiscountPermission: canManageDiscounts, hasManualPriceChange: referencePrices.some((item) => Math.abs(item.precioOriginal - item.precioUnitario) > 0.000001), hasPricePermission: canManageDiscounts });
+    let approvedRequest: { id: number; aprobadorId: number | null } | null = null;
+    if (exception.approvalType) {
+      if (!input.approvalId) {
+        const request = await requestApproval({ type: exception.approvalType, reason: input.exceptionReason?.trim() || "Excepción comercial solicitada al confirmar la venta", entity: "Venta", previousValues: { prices: referencePrices.map((item) => item.precioOriginal), discount: descuentoAutomatico }, proposedValues: { prices: referencePrices.map((item) => item.precioUnitario), discount: descuento, discountPercent: exception.discountPercent } });
+        return { error: "La excepción comercial requiere aprobación.", approvalRequestId: request.id };
+      }
+      approvedRequest = await prisma.solicitudAprobacion.findFirst({ where: { id: input.approvalId, solicitanteId: authenticatedUser.id, tipo: exception.approvalType, estado: "APROBADA", ejecutadoEn: null }, select: { id: true, aprobadorId: true } });
+      if (!approvedRequest) return { error: "La aprobación comercial no es válida, no está aprobada o ya fue utilizada." };
+    }
 
     if (!clienteId || !metodoPago || detalles.length === 0) {
       return { error: "Faltan datos obligatorios para procesar la venta." };
@@ -128,6 +154,7 @@ export async function procesarVenta(input: VentaInput) {
           cantidadPresentacion: conversion.presentationQuantity,
           conversionSnapshot: JSON.stringify(conversion),
           precioUnitario: item.precioUnitario,
+          precioOriginal: referencePrices.find((reference) => reference.productoId === item.productoId && reference.varianteId === item.varianteId)?.precioOriginal ?? item.precioUnitario,
           subtotal: itemSubtotal,
         });
       }
@@ -171,6 +198,8 @@ export async function procesarVenta(input: VentaInput) {
           usuarioId,
           clienteId,
           presupuestoId,
+          reglaDescuentoId,
+          descuentoAutomatico,
           subtotal,
           descuento,
           total,
@@ -178,6 +207,7 @@ export async function procesarVenta(input: VentaInput) {
           metodoPago,
           tipoEntrega,
           configuracionSnapshot: JSON.stringify(configurationSnapshot),
+          excepcionComercialSnapshot: JSON.stringify({ manualDiscount, limitPercent: limit, reason: input.exceptionReason ?? null, requesterId: authenticatedUser.id, approverId: approvedRequest?.aprobadorId ?? null }),
           detalles: {
             create: detallesToCreate,
           },
@@ -197,6 +227,10 @@ export async function procesarVenta(input: VentaInput) {
         await tx.reservaStock.update({ where: { id: reservation.id }, data: { estado: activeLines === 0 ? "CONSUMIDA" : "PARCIALMENTE_CONSUMIDA" } });
       }
       if (quotation) await tx.presupuesto.update({ where: { id: quotation.id }, data: { estado: "CONVERTIDO" } });
+      if (approvedRequest) {
+        const consumed = await tx.solicitudAprobacion.updateMany({ where: { id: approvedRequest.id, estado: "APROBADA", ejecutadoEn: null }, data: { estado: "EJECUTADA", ejecutadoEn: new Date() } });
+        if (consumed.count !== 1) throw new Error("La aprobación comercial ya fue utilizada.");
+      }
       await tx.movimientoInventario.updateMany({ where: { referenciaTipo: "VENTA", referenciaId: operationReference, usuarioId }, data: { referenciaId: venta.id.toString() } });
 
       await recordAudit({

@@ -302,6 +302,11 @@ model PresentacionVariante {
   descripcion      String?
   predeterminada   Boolean  @default(false)
   activa           Boolean  @default(true)
+  modoPrecio       String   @default("DERIVADO")
+  precioNeto       Float?
+  impuesto         Float    @default(0)
+  precioFinal      Float?
+  moneda           String   @default("PYG")
 
   variante VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
   unidad UnidadMedida       @relation(fields: [unidadId], references: [id])
@@ -457,6 +462,9 @@ model Venta {
   usuarioId      Int
   clienteId      Int
   presupuestoId  Int?          @unique
+  reglaDescuentoId Int?
+  descuentoAutomatico Float    @default(0)
+  excepcionComercialSnapshot String @default("{}")
   fecha          DateTime      @default(now())
   
   subtotal       Float
@@ -474,6 +482,7 @@ model Venta {
   usuario        Usuario       @relation(fields: [usuarioId], references: [id])
   cliente        Cliente       @relation(fields: [clienteId], references: [id])
   presupuesto    Presupuesto?  @relation(fields: [presupuestoId], references: [id])
+  reglaDescuento ReglaDescuento? @relation(fields: [reglaDescuentoId], references: [id])
   detalles       DetalleVenta[]
 }
 
@@ -488,6 +497,7 @@ model DetalleVenta {
   cantidadPresentacion Float?
   conversionSnapshot String @default("{}")
   precioUnitario Float
+  precioOriginal Float?
   subtotal       Float
   
   venta          Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
@@ -607,11 +617,19 @@ model ReglaDescuento {
   nombre             String
   tipo               String   // POR_VOLUMEN, POR_CATEGORIA, POR_MONTO
   categoriaId        Int?     // Si aplica solo a una categoría
+  familiaId          Int?
+  marcaId            Int?
+  productoId         Int?
+  varianteId         Int?
+  clienteId          Int?
+  vigenteDesde       DateTime?
+  vigenteHasta       DateTime?
   umbralMinimo       Float    // Ej: 20 m² o 500000 Gs.
   porcentajeDescuento Float   // Ej: 5 (= 5%)
   activa             Boolean  @default(true)
   creadoEn           DateTime @default(now())
   sucursal            Sucursal @relation(fields: [sucursalId], references: [id])
+  ventas              Venta[]
 
   @@index([sucursalId])
 }

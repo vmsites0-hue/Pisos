@@ -10,6 +10,7 @@ import { recordAudit } from "@/modules/audit/services/audit.service";
 import { normalizeRecalculationPolicy, quotationValuesChanged } from "@/modules/quotations/domain/recalculation";
 import { compareCommercialValues } from "@/modules/quotations/domain/variation";
 import { calcularDescuentoAutomatico } from "@/modules/discounts/services/discounts.service";
+import { resolvePresentationPrice } from "@/modules/pricing/domain/presentation-price";
 
 export interface DetallePresupuestoInput {
   productoId: number;
@@ -37,12 +38,14 @@ async function buildQuotationLines(detalles: DetallePresupuestoInput[]) {
     const variant = producto.variantes[0];
     if (!variant) throw new Error(`El producto "${producto.nombre}" no tiene una variante activa.`);
     const conversion = calculateProductQuantity(producto, item.cantidad);
+    const presentation = variant.presentaciones.find((entry) => entry.nombre === conversion.presentationName) ?? variant.presentaciones.find((entry) => entry.predeterminada) ?? null;
+    const resolvedPrice = presentation ? resolvePresentationPrice({ mode: presentation.modoPrecio as "DERIVADO" | "ESPECIFICO", factor: presentation.factorConversion, baseUnitPrice: variant.precioVenta, netPrice: presentation.precioNeto, taxRate: presentation.impuesto, finalPrice: presentation.precioFinal, currency: presentation.moneda }) : { unitPrice: variant.precioVenta };
+    const unitPrice = resolvedPrice.unitPrice;
     const lineDiscount = Number(item.descuento ?? 0);
-    const gross = conversion.actualQuantity * item.precioUnitario;
+    const gross = conversion.actualQuantity * unitPrice;
     const lineTotal = validateQuotationTotals(gross, lineDiscount);
     subtotal += lineTotal;
-    const presentation = variant.presentaciones.find((entry) => entry.nombre === conversion.presentationName) ?? variant.presentaciones.find((entry) => entry.predeterminada) ?? null;
-    lines.push({ productoId: item.productoId, varianteId: variant.id, presentacionId: presentation?.id, cantidad: conversion.actualQuantity, cantidadSolicitada: conversion.requestedQuantity, cantidadPresentacion: conversion.presentationQuantity, conversionSnapshot: JSON.stringify(conversion), precioUnitario: item.precioUnitario, descuento: lineDiscount, subtotal: lineTotal });
+    lines.push({ productoId: item.productoId, varianteId: variant.id, presentacionId: presentation?.id, cantidad: conversion.actualQuantity, cantidadSolicitada: conversion.requestedQuantity, cantidadPresentacion: conversion.presentationQuantity, conversionSnapshot: JSON.stringify(conversion), precioUnitario: unitPrice, descuento: lineDiscount, subtotal: lineTotal });
   }
   return { subtotal, lines };
 }
@@ -155,7 +158,7 @@ export async function compararVariacionesPresupuesto(id: number) {
       currentSubtotal += currentLineSubtotal;
       lines.push({ detailId: detail.id, sku: detail.variante?.sku ?? detail.producto.codigo, variations: compareCommercialValues({ previous: { price: detail.precioUnitario, presentation: oldConversion.presentationName ?? detail.producto.unidadVenta, factor: oldConversion.conversionFactor ?? detail.producto.m2PorCaja ?? 1, available: true, discount: detail.descuento }, current: { price: detail.variante?.precioVenta ?? detail.precioUnitario, presentation: conversion.presentationName, factor: conversion.conversionFactor, available: availableQuantity >= conversion.actualQuantity, discount: detail.descuento } }), availableQuantity, requiredQuantity: conversion.actualQuantity });
     }
-    const automaticDiscount = await calcularDescuentoAutomatico(quotation.detalles.map((detail) => ({ productoId: detail.productoId, categoriaId: detail.producto.categoriaId, cantidad: detail.cantidad, precioUnitario: detail.variante?.precioVenta ?? detail.precioUnitario, subtotal: detail.cantidad * (detail.variante?.precioVenta ?? detail.precioUnitario) })));
+    const automaticDiscount = await calcularDescuentoAutomatico(quotation.detalles.map((detail) => ({ productoId: detail.productoId, varianteId: detail.varianteId, categoriaId: detail.producto.categoriaId, familiaId: detail.producto.familiaId, marcaId: detail.producto.marcaId, cantidad: detail.cantidad, precioUnitario: detail.variante?.precioVenta ?? detail.precioUnitario, subtotal: detail.cantidad * (detail.variante?.precioVenta ?? detail.precioUnitario) })), quotation.clienteId);
     const discountVariations = quotation.descuento === automaticDiscount.monto ? [] : [{ field: "DESCUENTO" as const, previous: quotation.descuento, current: automaticDiscount.monto, difference: automaticDiscount.monto - quotation.descuento }];
     const totalCurrent = currentSubtotal - automaticDiscount.monto;
     const hasVariations = lines.some((line) => line.variations.length > 0) || discountVariations.length > 0;

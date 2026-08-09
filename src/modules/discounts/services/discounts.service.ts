@@ -4,6 +4,7 @@ import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { requireAuthenticatedUser } from "@/modules/auth/services/session.service";
 import { getMainBranch } from "@/modules/branches/services/main-branch.service";
+import { evaluateBestPromotion } from "@/modules/discounts/domain/promotion-engine";
 
 export async function getReglasDescuento() {
   await requireAuthenticatedUser();
@@ -22,6 +23,8 @@ export async function createReglaDescuento(formData: FormData) {
   const categoriaIdStr = formData.get("categoriaId") as string;
   const umbralMinimo = parseFloat(formData.get("umbralMinimo") as string);
   const porcentajeDescuento = parseFloat(formData.get("porcentajeDescuento") as string);
+  const optionalId = (key: string) => { const value = Number(formData.get(key)); return Number.isInteger(value) && value > 0 ? value : null; };
+  const optionalDate = (key: string) => { const value = String(formData.get(key) ?? ""); return value ? new Date(value) : null; };
 
   if (!nombre || !tipo) return { error: "Nombre y tipo son requeridos." };
   if (isNaN(umbralMinimo) || isNaN(porcentajeDescuento)) return { error: "Umbral y porcentaje deben ser numéricos." };
@@ -34,6 +37,8 @@ export async function createReglaDescuento(formData: FormData) {
         nombre,
         tipo,
         categoriaId: categoriaIdStr ? parseInt(categoriaIdStr) : null,
+        familiaId: optionalId("familiaId"), marcaId: optionalId("marcaId"), productoId: optionalId("productoId"), varianteId: optionalId("varianteId"), clienteId: optionalId("clienteId"),
+        vigenteDesde: optionalDate("vigenteDesde"), vigenteHasta: optionalDate("vigenteHasta"),
         umbralMinimo,
         porcentajeDescuento,
         activa: true,
@@ -78,12 +83,15 @@ export async function toggleReglaDescuento(id: number, activa: boolean) {
 export interface CartItemForDiscount {
   productoId: number;
   categoriaId: number;
+  varianteId?: number | null;
+  familiaId?: number | null;
+  marcaId?: number | null;
   cantidad: number; // en m2 o unidades
   precioUnitario: number;
   subtotal: number;
 }
 
-export async function calcularDescuentoAutomatico(items: CartItemForDiscount[]) {
+export async function calcularDescuentoAutomatico(items: CartItemForDiscount[], clienteId?: number | null) {
   await requireAuthenticatedUser();
   const mainBranch = await getMainBranch();
   const reglas = await prisma.reglaDescuento.findMany({
@@ -91,43 +99,8 @@ export async function calcularDescuentoAutomatico(items: CartItemForDiscount[]) 
   });
 
   if (reglas.length === 0 || items.length === 0) {
-    return { porcentaje: 0, monto: 0, reglaAplicada: null };
+    return { porcentaje: 0, monto: 0, reglaAplicada: null, reglaAplicadaId: null };
   }
-
-  const subtotalGeneral = items.reduce((acc, item) => acc + item.subtotal, 0);
-  const cantidadTotalM2 = items.reduce((acc, item) => acc + item.cantidad, 0);
-
-  let mejorDescuento = 0;
-  let reglaAplicada: string | null = null;
-
-  for (const regla of reglas) {
-    let aplica = false;
-
-    if (regla.tipo === "POR_VOLUMEN") {
-      // Aplica si la cantidad total de m2 supera el umbral
-      aplica = cantidadTotalM2 >= regla.umbralMinimo;
-    } else if (regla.tipo === "POR_MONTO") {
-      // Aplica si el subtotal general supera el umbral en Gs.
-      aplica = subtotalGeneral >= regla.umbralMinimo;
-    } else if (regla.tipo === "POR_CATEGORIA" && regla.categoriaId) {
-      // Aplica si hay items de esa categoría cuya cantidad supera el umbral
-      const cantidadCategoria = items
-        .filter((it) => it.categoriaId === regla.categoriaId)
-        .reduce((acc, it) => acc + it.cantidad, 0);
-      aplica = cantidadCategoria >= regla.umbralMinimo;
-    }
-
-    if (aplica && regla.porcentajeDescuento > mejorDescuento) {
-      mejorDescuento = regla.porcentajeDescuento;
-      reglaAplicada = regla.nombre;
-    }
-  }
-
-  const montoDescuento = Math.round(subtotalGeneral * (mejorDescuento / 100));
-
-  return {
-    porcentaje: mejorDescuento,
-    monto: montoDescuento,
-    reglaAplicada,
-  };
+  const result = evaluateBestPromotion({ items, rules: reglas, clientId: clienteId });
+  return { porcentaje: result.percentage, monto: result.amount, reglaAplicada: result.ruleName, reglaAplicadaId: result.ruleId };
 }
