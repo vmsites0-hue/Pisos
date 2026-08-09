@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
+import { recordAudit } from "@/modules/audit/services/audit.service";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -149,6 +150,14 @@ export async function procesarVenta(input: VentaInput) {
           sucursal: true,
         },
       });
+
+      await recordAudit({
+        userId: usuarioId,
+        action: "VENTA_CONFIRMADA",
+        entity: "Venta",
+        entityId: venta.id,
+        after: { clienteId, subtotal, descuento, total, metodoPago, tipoEntrega, detalles },
+      }, tx);
 
       return venta;
     });

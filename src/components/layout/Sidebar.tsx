@@ -8,7 +8,8 @@ import {
   Settings,
   CreditCard,
   FileText,
-  ShieldCheck
+  ShieldCheck,
+  ScrollText
 } from "lucide-react";
 
 export function Sidebar() {
@@ -27,6 +28,7 @@ export function Sidebar() {
         <SidebarItem href="/logistica" icon={<Truck size={20} />} label="Logística" />
         <SidebarItem href="/finanzas" icon={<CreditCard size={20} />} label="Finanzas" />
         <SidebarItem href="/aprobaciones" icon={<ShieldCheck size={20} />} label="Aprobaciones" />
+        <SidebarItem href="/auditoria" icon={<ScrollText size={20} />} label="Auditoría" />
       </nav>
       
       <div className="p-4 border-t">

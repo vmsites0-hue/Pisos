@@ -37,6 +37,7 @@ const permissions = [
   ["payments.create", "Registrar cobros"],
   ["approvals.review", "Aprobar o rechazar operaciones restringidas"],
   ["approvals.policy.manage", "Configurar políticas de aprobación"],
+  ["audit.view", "Consultar registros de auditoría"],
 ];
 
 const roles = [

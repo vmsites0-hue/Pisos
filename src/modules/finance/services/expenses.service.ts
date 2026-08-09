@@ -2,9 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
+import { recordAudit } from "@/modules/audit/services/audit.service";
 
 export async function registrarGasto(formData: FormData) {
-  await requirePermission(PERMISSIONS.EXPENSES_CREATE);
+  const user = await requirePermission(PERMISSIONS.EXPENSES_CREATE);
   try {
     const descripcion = (formData.get("descripcion") as string)?.trim();
     const monto = parseFloat(formData.get("monto") as string);
@@ -14,13 +15,14 @@ export async function registrarGasto(formData: FormData) {
       return { error: "Faltan datos obligatorios o el monto es inválido." };
     }
 
-    await prisma.gasto.create({
+    const expense = await prisma.gasto.create({
       data: {
         descripcion,
         monto,
         categoria,
       },
     });
+    await recordAudit({ userId: user.id, action: "GASTO_REGISTRADO", entity: "Gasto", entityId: expense.id, after: expense });
 
     revalidatePath("/finanzas");
     revalidatePath("/");
@@ -31,11 +33,12 @@ export async function registrarGasto(formData: FormData) {
 }
 
 export async function eliminarGasto(id: number) {
-  await requirePermission(PERMISSIONS.EXPENSES_DELETE);
+  const user = await requirePermission(PERMISSIONS.EXPENSES_DELETE);
   try {
-    await prisma.gasto.delete({
+    const expense = await prisma.gasto.delete({
       where: { id },
     });
+    await recordAudit({ userId: user.id, action: "GASTO_ELIMINADO", entity: "Gasto", entityId: id, before: expense });
 
     revalidatePath("/finanzas");
     revalidatePath("/");

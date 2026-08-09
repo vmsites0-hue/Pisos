@@ -64,6 +64,10 @@ límite, cambios manuales de precio, ajustes negativos, cancelaciones,
 devoluciones y eliminación de gastos. Por defecto nadie puede aprobar su propia
 solicitud y cada aprobación puede consumirse una sola vez.
 
+`/auditoria` ofrece un registro de solo lectura para accesos y operaciones
+sensibles. Contraseñas, tokens, cookies y secretos se redactan antes de guardar
+los valores anteriores o posteriores.
+
 ## Base local histórica
 
 El repositorio original contenía `dev.db` sin historial de migraciones. No se debe ejecutar la migración inicial sobre esa base como si estuviera vacía.
@@ -117,6 +121,9 @@ pnpm check
 | `pnpm db:deploy` | Aplicar migraciones versionadas |
 | `pnpm db:seed` | Crear datos mínimos iniciales |
 | `pnpm db:studio` | Abrir Prisma Studio |
+| `pnpm test` | Ejecutar pruebas unitarias una vez |
+| `pnpm test:watch` | Ejecutar pruebas unitarias en modo interactivo |
+| `pnpm check` | TypeScript, lint, tests unitarios y build de producción |
 
 ## Arquitectura
 

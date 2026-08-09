@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
+import { recordAudit } from "@/modules/audit/services/audit.service";
 
 export async function actualizarEstadoEnvio(
   ventaId: number, 
@@ -9,7 +10,7 @@ export async function actualizarEstadoEnvio(
   chofer?: string | null,
   observaciones?: string | null
 ) {
-  await requirePermission(PERMISSIONS.LOGISTICS_UPDATE);
+  const user = await requirePermission(PERMISSIONS.LOGISTICS_UPDATE);
   try {
     const validStates = ["PENDIENTE", "ENCARGADO", "DESPACHADO", "ENTREGADO"];
     if (!validStates.includes(nuevoEstado)) {
@@ -27,10 +28,12 @@ export async function actualizarEstadoEnvio(
       updateData.observaciones = observaciones;
     }
 
-    await prisma.venta.update({
+    const before = await prisma.venta.findUniqueOrThrow({ where: { id: ventaId } });
+    const updated = await prisma.venta.update({
       where: { id: ventaId },
       data: updateData,
     });
+    await recordAudit({ userId: user.id, action: "ENTREGA_ACTUALIZADA", entity: "Venta", entityId: ventaId, before, after: updated });
 
     revalidatePath("/logistica");
     revalidatePath("/");
