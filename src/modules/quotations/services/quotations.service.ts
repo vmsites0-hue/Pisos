@@ -10,6 +10,7 @@ import { recordAudit } from "@/modules/audit/services/audit.service";
 import { normalizeRecalculationPolicy, quotationValuesChanged } from "@/modules/quotations/domain/recalculation";
 import { compareCommercialValues } from "@/modules/quotations/domain/variation";
 import { calcularDescuentoAutomatico } from "@/modules/discounts/services/discounts.service";
+import { resolvePresentationPrice } from "@/modules/pricing/domain/presentation-price";
 
 export interface DetallePresupuestoInput {
   productoId: number;
@@ -37,12 +38,14 @@ async function buildQuotationLines(detalles: DetallePresupuestoInput[]) {
     const variant = producto.variantes[0];
     if (!variant) throw new Error(`El producto "${producto.nombre}" no tiene una variante activa.`);
     const conversion = calculateProductQuantity(producto, item.cantidad);
+    const presentation = variant.presentaciones.find((entry) => entry.nombre === conversion.presentationName) ?? variant.presentaciones.find((entry) => entry.predeterminada) ?? null;
+    const resolvedPrice = presentation ? resolvePresentationPrice({ mode: presentation.modoPrecio as "DERIVADO" | "ESPECIFICO", factor: presentation.factorConversion, baseUnitPrice: variant.precioVenta, netPrice: presentation.precioNeto, taxRate: presentation.impuesto, finalPrice: presentation.precioFinal, currency: presentation.moneda }) : { unitPrice: variant.precioVenta };
+    const unitPrice = resolvedPrice.unitPrice;
     const lineDiscount = Number(item.descuento ?? 0);
-    const gross = conversion.actualQuantity * item.precioUnitario;
+    const gross = conversion.actualQuantity * unitPrice;
     const lineTotal = validateQuotationTotals(gross, lineDiscount);
     subtotal += lineTotal;
-    const presentation = variant.presentaciones.find((entry) => entry.nombre === conversion.presentationName) ?? variant.presentaciones.find((entry) => entry.predeterminada) ?? null;
-    lines.push({ productoId: item.productoId, varianteId: variant.id, presentacionId: presentation?.id, cantidad: conversion.actualQuantity, cantidadSolicitada: conversion.requestedQuantity, cantidadPresentacion: conversion.presentationQuantity, conversionSnapshot: JSON.stringify(conversion), precioUnitario: item.precioUnitario, descuento: lineDiscount, subtotal: lineTotal });
+    lines.push({ productoId: item.productoId, varianteId: variant.id, presentacionId: presentation?.id, cantidad: conversion.actualQuantity, cantidadSolicitada: conversion.requestedQuantity, cantidadPresentacion: conversion.presentationQuantity, conversionSnapshot: JSON.stringify(conversion), precioUnitario: unitPrice, descuento: lineDiscount, subtotal: lineTotal });
   }
   return { subtotal, lines };
 }

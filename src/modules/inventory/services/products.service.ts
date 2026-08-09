@@ -40,12 +40,19 @@ async function resolveCommerce(categoriaId: number, formData: FormData) {
   const presentationName = String(formData.get("nombrePresentacion") ?? "").trim();
   const piecesRaw = String(formData.get("piezasPresentacion") ?? "").trim();
   const pieces = piecesRaw ? Number(piecesRaw) : null;
-  const presentations: { unidadId: number; nombre: string; factorConversion: number; piezas?: number; descripcion?: string; predeterminada: boolean }[] = [{ unidadId: unidadBaseId, nombre: unit.nombre, factorConversion: 1, predeterminada: true }];
+  const presentations: { unidadId: number; nombre: string; factorConversion: number; piezas?: number; descripcion?: string; predeterminada: boolean; modoPrecio?: string; precioNeto?: number; impuesto?: number; precioFinal?: number; moneda?: string }[] = [{ unidadId: unidadBaseId, nombre: unit.nombre, factorConversion: 1, predeterminada: true }];
   if (presentationName) {
     validatePresentation({ factorConversion: presentationFactor, piezas: pieces });
     const presentationUnit = await prisma.unidadMedida.findUnique({ where: { id: presentationUnitId } });
     if (!presentationName || !presentationUnit?.activa) throw new Error("La presentación y su unidad son obligatorias.");
-    if (presentationName !== unit.nombre || presentationUnitId !== unidadBaseId) presentations.push({ unidadId: presentationUnitId, nombre: presentationName, factorConversion: presentationFactor, piezas: pieces ?? undefined, descripcion: String(formData.get("descripcionPresentacion") ?? "").trim() || undefined, predeterminada: false });
+    if (presentationName !== unit.nombre || presentationUnitId !== unidadBaseId) {
+      const priceMode = String(formData.get("modoPrecioPresentacion") ?? "DERIVADO");
+      const netPrice = Number(formData.get("precioNetoPresentacion"));
+      const tax = Number(formData.get("impuestoPresentacion") ?? 0);
+      const finalPrice = Number(formData.get("precioFinalPresentacion"));
+      if (priceMode === "ESPECIFICO" && (!Number.isFinite(netPrice) || netPrice < 0 || !Number.isFinite(finalPrice) || finalPrice < 0 || tax < 0)) throw new Error("Complete precios e impuesto válidos para la presentación.");
+      presentations.push({ unidadId: presentationUnitId, nombre: presentationName, factorConversion: presentationFactor, piezas: pieces ?? undefined, descripcion: String(formData.get("descripcionPresentacion") ?? "").trim() || undefined, predeterminada: false, modoPrecio: priceMode, ...(priceMode === "ESPECIFICO" ? { precioNeto: netPrice, impuesto: tax, precioFinal: finalPrice, moneda: String(formData.get("monedaPresentacion") ?? "PYG") } : {}) });
+    }
   }
   return { unit, unidadBaseId, politicaVenta, multiploVenta, presentations };
 }

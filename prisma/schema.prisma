@@ -302,6 +302,11 @@ model PresentacionVariante {
   descripcion      String?
   predeterminada   Boolean  @default(false)
   activa           Boolean  @default(true)
+  modoPrecio       String   @default("DERIVADO")
+  precioNeto       Float?
+  impuesto         Float    @default(0)
+  precioFinal      Float?
+  moneda           String   @default("PYG")
 
   variante VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
   unidad UnidadMedida       @relation(fields: [unidadId], references: [id])
