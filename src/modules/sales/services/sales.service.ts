@@ -10,6 +10,7 @@ import { recordInventoryMovement } from "@/modules/inventory/services/inventory-
 import { randomUUID } from "node:crypto";
 import { syncMinimumStockAlert } from "@/modules/inventory/services/minimum-stock.service";
 import { syncPhysicalPackaging } from "@/modules/inventory/services/open-presentations.service";
+import { validateQuotationConversion } from "@/modules/quotations/domain/quotation-conversion";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -56,6 +57,14 @@ export async function procesarVenta(input: VentaInput) {
       });
       if (!cliente) {
         throw new Error("El cliente seleccionado no existe.");
+      }
+
+      const quotation = presupuestoId ? await tx.presupuesto.findUnique({ where: { id: presupuestoId }, include: { venta: { select: { id: true } } } }) : null;
+      if (presupuestoId && !quotation) throw new Error("El presupuesto indicado no existe.");
+      if (quotation) {
+        const conversionError = validateQuotationConversion({ estado: quotation.estado, venceEn: quotation.venceEn, ventaId: quotation.venta?.id });
+        if (conversionError) throw new Error(conversionError);
+        if (quotation.clienteId !== clienteId || quotation.sucursalId !== sucursalId) throw new Error("El presupuesto no corresponde al cliente o sucursal de la venta.");
       }
 
       let subtotal = 0;
@@ -161,6 +170,7 @@ export async function procesarVenta(input: VentaInput) {
           sucursalId,
           usuarioId,
           clienteId,
+          presupuestoId,
           subtotal,
           descuento,
           total,
@@ -186,6 +196,7 @@ export async function procesarVenta(input: VentaInput) {
         const activeLines = await tx.lineaReservaStock.count({ where: { reservaId: reservation.id, estado: "ACTIVA" } });
         await tx.reservaStock.update({ where: { id: reservation.id }, data: { estado: activeLines === 0 ? "CONSUMIDA" : "PARCIALMENTE_CONSUMIDA" } });
       }
+      if (quotation) await tx.presupuesto.update({ where: { id: quotation.id }, data: { estado: "CONVERTIDO" } });
       await tx.movimientoInventario.updateMany({ where: { referenciaTipo: "VENTA", referenciaId: operationReference, usuarioId }, data: { referenciaId: venta.id.toString() } });
 
       await recordAudit({

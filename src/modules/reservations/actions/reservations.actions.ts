@@ -16,5 +16,5 @@ export async function releaseReservationAction(formData: FormData) {
 }
 
 export async function convertReservationToSaleAction(formData: FormData) {
-  return convertReservationToSale({ reservationId: Number(formData.get("reservationId")), paymentMethod: String(formData.get("paymentMethod") ?? "EFECTIVO"), deliveryType: String(formData.get("deliveryType") ?? "ENVIO") });
+  return convertReservationToSale({ reservationId: Number(formData.get("reservationId")), paymentMethod: String(formData.get("paymentMethod") ?? "EFECTIVO"), deliveryType: String(formData.get("deliveryType") ?? "ENVIO"), variationDecision: String(formData.get("variationDecision") ?? "AUTO") as "AUTO" | "PRESERVE" | "RECALCULATE" | "CANCEL" });
 }

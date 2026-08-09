@@ -9,6 +9,7 @@ import { recordAudit } from "@/modules/audit/services/audit.service";
 import { resolveReservationExpiration } from "@/modules/reservations/domain/expiration";
 import { canReleaseReservation } from "@/modules/reservations/domain/reservation-state";
 import { procesarVenta } from "@/modules/sales/services/sales.service";
+import { compararVariacionesPresupuesto, recalcularPresupuesto } from "@/modules/quotations/services/quotations.service";
 
 export async function createManualReservation(input: { quotationId: number; lines: Array<{ quotationLineId: number; quantity: number }>; expirationMode: "NONE" | "DEFAULT" | "CUSTOM"; customExpiration?: string | null }) {
   const user = await requirePermission(PERMISSIONS.RESERVATIONS_MANAGE);
@@ -61,9 +62,25 @@ export async function releaseReservation(id: number, reason: string) {
   revalidatePath("/presupuestos"); revalidatePath("/inventario");
 }
 
-export async function convertReservationToSale(input: { reservationId: number; paymentMethod: string; deliveryType: string }) {
-  const reservation = await prisma.reservaStock.findUnique({ where: { id: input.reservationId }, include: { presupuesto: { include: { detalles: true } }, lineas: { where: { estado: "ACTIVA" }, include: { detallePresupuesto: true, inventario: true } } } });
+export async function convertReservationToSale(input: { reservationId: number; paymentMethod: string; deliveryType: string; variationDecision?: "AUTO" | "PRESERVE" | "RECALCULATE" | "CANCEL" }) {
+  let reservation = await prisma.reservaStock.findUnique({ where: { id: input.reservationId }, include: { presupuesto: { include: { detalles: true, venta: { select: { id: true } } } }, lineas: { where: { estado: "ACTIVA" }, include: { detallePresupuesto: true, inventario: true } } } });
   if (!reservation || reservation.estado !== "ACTIVA" || (reservation.venceEn && reservation.venceEn <= new Date())) return { error: "La reserva está vencida, liberada o ya fue utilizada." };
+  if (reservation.presupuesto.venta) return { error: "El presupuesto ya fue convertido en una venta." };
   if (!reservation.lineas.length) return { error: "La reserva no tiene líneas activas." };
-  return procesarVenta({ clienteId: reservation.presupuesto.clienteId, descuento: 0, metodoPago: input.paymentMethod, tipoEntrega: input.deliveryType, reservaId: reservation.id, presupuestoId: reservation.presupuestoId, sucursalId: reservation.presupuesto.sucursalId, detalles: reservation.lineas.map((line) => ({ productoId: line.detallePresupuesto.productoId, varianteId: line.inventario.varianteId, inventarioId: line.inventarioId, lineaReservaId: line.id, loteTono: line.inventario.loteTono, cantidad: line.cantidad, precioUnitario: line.detallePresupuesto.precioUnitario })) });
+  if (input.variationDecision === "CANCEL") return { error: "Conversión cancelada por el usuario." };
+  const comparison = await compararVariacionesPresupuesto(reservation.presupuestoId);
+  if (comparison.error) return comparison;
+  if (comparison.hasVariations) {
+    const decision = input.variationDecision === "AUTO" || !input.variationDecision
+      ? (reservation.presupuesto.politicaRecalculo === "AL_CONVERTIR" ? "RECALCULATE" : reservation.presupuesto.politicaRecalculo === "CONSERVAR" ? "PRESERVE" : "REVIEW")
+      : input.variationDecision;
+    if (decision === "REVIEW") return { error: "El presupuesto tiene variaciones. Debe elegir conservar o recalcular antes de convertir.", variations: comparison };
+    if (decision === "RECALCULATE") {
+      const recalculation = await recalcularPresupuesto(reservation.presupuestoId);
+      if (recalculation.error) return recalculation;
+      reservation = await prisma.reservaStock.findUnique({ where: { id: input.reservationId }, include: { presupuesto: { include: { detalles: true, venta: { select: { id: true } } } }, lineas: { where: { estado: "ACTIVA" }, include: { detallePresupuesto: true, inventario: true } } } });
+      if (!reservation) return { error: "No se pudo recargar la reserva recalculada." };
+    }
+  }
+  return procesarVenta({ clienteId: reservation.presupuesto.clienteId, descuento: reservation.presupuesto.descuento, metodoPago: input.paymentMethod, tipoEntrega: input.deliveryType, reservaId: reservation.id, presupuestoId: reservation.presupuestoId, sucursalId: reservation.presupuesto.sucursalId, detalles: reservation.lineas.map((line) => ({ productoId: line.detallePresupuesto.productoId, varianteId: line.inventario.varianteId, inventarioId: line.inventarioId, lineaReservaId: line.id, loteTono: line.inventario.loteTono, cantidad: line.cantidad, precioUnitario: line.detallePresupuesto.precioUnitario })) });
 }

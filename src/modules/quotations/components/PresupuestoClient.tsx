@@ -15,7 +15,7 @@ import {
   X,
   Download
 } from "lucide-react";
-import { crearPresupuesto, eliminarPresupuesto } from "@/modules/quotations/actions/quotations.actions";
+import { actualizarPresupuesto, compararVariacionesPresupuesto, crearPresupuesto, eliminarPresupuesto, recalcularPresupuesto } from "@/modules/quotations/actions/quotations.actions";
 import { ManualReservationForm } from "@/modules/reservations/components/ManualReservationForm";
 import { ReservationActions } from "@/modules/reservations/components/ReservationActions";
 
@@ -34,6 +34,10 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
   const [clienteId, setClienteId] = useState<number>(0);
   const [cart, setCart] = useState<any[]>([]);
   const [descuento, setDescuento] = useState<number>(0);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [expirationMode, setExpirationMode] = useState<"NONE" | "DEFAULT" | "CUSTOM">("NONE");
+  const [customExpiration, setCustomExpiration] = useState("");
+  const [recalculationPolicy, setRecalculationPolicy] = useState("CONSERVAR");
 
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -41,6 +45,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
 
   const [showReceipt, setShowReceipt] = useState(false);
   const [createdPresupuesto, setCreatedPresupuesto] = useState<any>(null);
+  const [variationReport, setVariationReport] = useState<any>(null);
 
   const handleDownloadPDF = async () => {
     if (!createdPresupuesto) return;
@@ -215,6 +220,9 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
     const inputData = {
       clienteId,
       descuento,
+      expirationMode,
+      customExpiration: expirationMode === "CUSTOM" ? customExpiration : null,
+      recalculationPolicy,
       detalles: cart.map(item => ({
         productoId: item.productoId,
         varianteId: item.varianteId,
@@ -223,7 +231,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
       }))
     };
 
-    const res = await crearPresupuesto(inputData);
+    const res = editingId ? await actualizarPresupuesto(editingId, inputData) : await crearPresupuesto(inputData);
     setLoading(false);
 
     if (res.error) {
@@ -232,6 +240,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
       setCreatedPresupuesto(res.presupuesto);
       setCart([]);
       setDescuento(0);
+      setEditingId(null); setExpirationMode("NONE"); setCustomExpiration(""); setRecalculationPolicy("CONSERVAR");
       setShowReceipt(true);
     }
   }
@@ -248,6 +257,15 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
   const handleViewPresupuesto = (p: any) => {
     setCreatedPresupuesto(p);
     setShowReceipt(true);
+  };
+
+  const handleEditPresupuesto = (p: any) => {
+    setEditingId(p.id); setClienteId(p.clienteId); setDescuento(p.descuento);
+    setExpirationMode(p.venceEn ? "CUSTOM" : "NONE");
+    setCustomExpiration(p.venceEn ? new Date(new Date(p.venceEn).getTime() - new Date(p.venceEn).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "");
+    setRecalculationPolicy(p.politicaRecalculo ?? "CONSERVAR");
+    setCart(p.detalles.map((detail: any) => ({ productoId: detail.productoId, varianteId: detail.varianteId, codigo: detail.producto.codigo, nombre: detail.producto.nombre, unidadVenta: detail.producto.unidadVenta, m2PorCaja: detail.producto.m2PorCaja, precioVenta: detail.precioUnitario, cantidad: detail.cantidadSolicitada ?? detail.cantidad, cajas: detail.cantidadPresentacion?.toString() ?? "" })));
+    setActiveTab("crear"); setError(null);
   };
 
   const formatMoney = (val: number) => {
@@ -311,12 +329,11 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
                 </tr>
               ) : (
                 presupuestos.map((p) => {
-                  const limiteFecha = new Date(p.fecha);
-                  limiteFecha.setDate(limiteFecha.getDate() + p.validezDias);
+                  const limiteFecha = p.venceEn ? new Date(p.venceEn) : null;
                   
                   return (
                     <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 font-semibold text-slate-900">#PRES-{p.id}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-900">#PRES-{p.id}<span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[9px]">{p.estado}</span></td>
                       <td className="px-6 py-4 text-slate-500">
                         {new Date(p.fecha).toLocaleDateString("es-PY")}
                       </td>
@@ -325,7 +342,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
                         <div className="text-[10px] text-slate-500">CI: {p.cliente.documento}</div>
                       </td>
                       <td className="px-6 py-4 text-right font-medium text-slate-600">
-                        {p.validezDias} días (Hasta {limiteFecha.toLocaleDateString("es-PY")})
+                        {limiteFecha ? `Hasta ${limiteFecha.toLocaleDateString("es-PY")}` : "Sin vencimiento"}
                         {p.reservas?.map((reservation: any) => <span key={reservation.id} className="mt-1 block text-[10px] text-blue-700">Reserva #{reservation.id}: {reservation.estado}{reservation.venceEn ? ` · vence ${new Date(reservation.venceEn).toLocaleString("es-PY")}` : " · sin vencimiento"}</span>)}
                       </td>
                       <td className="px-6 py-4 text-right font-bold text-slate-900">
@@ -340,6 +357,9 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
                         >
                           Ver / Imprimir
                         </button>
+                        {p.estado === "ABIERTO" && <button onClick={() => handleEditPresupuesto(p)} className="rounded border bg-white px-2 py-1 text-xs font-semibold text-slate-600">Editar</button>}
+                        {p.estado === "ABIERTO" && p.politicaRecalculo === "MANUAL" && <button onClick={async () => { const result = await recalcularPresupuesto(p.id); if (result.error) alert(result.error); else alert(result.changed ? "Presupuesto actualizado por variaciones." : "No hubo variaciones; no se modificó."); }} className="rounded border bg-white px-2 py-1 text-xs font-semibold text-emerald-700">Recalcular</button>}
+                        {p.estado === "ABIERTO" && <button onClick={async () => { const result = await compararVariacionesPresupuesto(p.id); if (result.error) alert(result.error); else if (!result.hasVariations) alert("No existen variaciones comerciales."); else setVariationReport({ ...result, quotationId: p.id }); }} className="rounded border bg-white px-2 py-1 text-xs font-semibold text-amber-700">Comparar</button>}
                         <button
                           onClick={() => handleDeletePresupuesto(p.id)}
                           className="p-1.5 text-slate-400 hover:text-red-600 rounded transition-colors inline-block cursor-pointer"
@@ -581,16 +601,56 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
                 </div>
               </div>
 
+              <div className="mb-3 grid grid-cols-1 gap-2 border-t pt-3 sm:grid-cols-2"><label className="text-xs font-medium">Vigencia<select value={expirationMode} onChange={(event) => setExpirationMode(event.target.value as typeof expirationMode)} className="mt-1 w-full rounded border bg-white p-2"><option value="NONE">Sin vencimiento</option><option value="DEFAULT">Predeterminada</option><option value="CUSTOM">Fecha específica</option></select></label>{expirationMode === "CUSTOM" && <label className="text-xs font-medium">Vence en<input required type="datetime-local" value={customExpiration} onChange={(event) => setCustomExpiration(event.target.value)} className="mt-1 w-full rounded border p-2" /></label>}<label className="text-xs font-medium">Política de recálculo<select value={recalculationPolicy} onChange={(event) => setRecalculationPolicy(event.target.value)} className="mt-1 w-full rounded border bg-white p-2"><option value="CONSERVAR">Conservar valores originales</option><option value="MANUAL">Recalcular manualmente</option><option value="AL_CONVERTIR">Recalcular al convertir</option></select></label></div>
               <button
                 onClick={handleGuardarPresupuesto}
                 disabled={loading || cart.length === 0}
                 className="w-full bg-slate-950 hover:bg-slate-800 text-white py-3 rounded-lg text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow"
               >
-                {loading ? "Guardando..." : "Guardar Presupuesto"}
+                {loading ? "Guardando..." : editingId ? "Guardar cambios" : "Guardar Presupuesto"}
               </button>
             </div>
           </div>
 
+        </div>
+      )}
+
+      {variationReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h4 className="text-lg font-bold text-slate-950">Variaciones comerciales</h4>
+                <p className="text-sm text-slate-500">Revise los cambios antes de convertir el presupuesto.</p>
+              </div>
+              <button onClick={() => setVariationReport(null)} aria-label="Cerrar"><X size={20} /></button>
+            </div>
+            <div className="space-y-3">
+              {variationReport.lines?.map((line: any) => (
+                <div key={line.detailId} className="rounded-lg border p-3">
+                  <p className="font-semibold">{line.sku}</p>
+                  {line.variations.map((variation: any) => (
+                    <p key={variation.field} className="mt-1 text-sm text-slate-700">
+                      {variation.field}: <span className="text-slate-500">{String(variation.previous)}</span> → <span className="font-medium">{String(variation.current)}</span>
+                    </p>
+                  ))}
+                </div>
+              ))}
+              {variationReport.discountVariations?.map((variation: any) => (
+                <p key={variation.field} className="rounded-lg border p-3 text-sm">DESCUENTO: {String(variation.previous)} → {String(variation.current)}</p>
+              ))}
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2 rounded-lg bg-slate-100 p-3 text-center text-sm">
+              <div><span className="block text-slate-500">Anterior</span>{formatMoney(variationReport.previousTotal)}</div>
+              <div><span className="block text-slate-500">Actual</span>{formatMoney(variationReport.currentTotal)}</div>
+              <div><span className="block text-slate-500">Diferencia</span>{formatMoney(variationReport.totalDifference)}</div>
+            </div>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button onClick={() => setVariationReport(null)} className="rounded border px-3 py-2 text-sm font-semibold">Cancelar conversión</button>
+              <button onClick={() => setVariationReport(null)} className="rounded border px-3 py-2 text-sm font-semibold text-amber-700">Conservar valores</button>
+              <button onClick={async () => { const result = await recalcularPresupuesto(variationReport.quotationId); if (result.error) alert(result.error); else { alert("Presupuesto recalculado."); setVariationReport(null); } }} className="rounded bg-slate-950 px-3 py-2 text-sm font-semibold text-white">Recalcular</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -602,7 +662,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
             <div className="bg-slate-950 p-4 text-white text-center flex flex-col items-center gap-2 relative">
               <FileText className="text-blue-400" size={36} />
               <div>
-                <h4 className="font-bold text-lg">Presupuesto / Cotización</h4>
+                <h4 className="font-bold text-lg">Presupuesto / Cotización</h4><p className="text-[10px] font-bold uppercase text-amber-600">Documento no fiscal</p>
                 <p className="text-slate-400 text-xs">Nro: #PRES-{createdPresupuesto.id}</p>
               </div>
               <button 

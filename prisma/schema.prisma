@@ -305,6 +305,7 @@ model PresentacionVariante {
 
   variante VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
   unidad UnidadMedida       @relation(fields: [unidadId], references: [id])
+  detallesPresupuesto DetallePresupuesto[]
 
   @@unique([varianteId, nombre])
   @@index([unidadId])
@@ -455,6 +456,7 @@ model Venta {
   sucursalId     Int
   usuarioId      Int
   clienteId      Int
+  presupuestoId  Int?          @unique
   fecha          DateTime      @default(now())
   
   subtotal       Float
@@ -471,6 +473,7 @@ model Venta {
   sucursal       Sucursal      @relation(fields: [sucursalId], references: [id])
   usuario        Usuario       @relation(fields: [usuarioId], references: [id])
   cliente        Cliente       @relation(fields: [clienteId], references: [id])
+  presupuesto    Presupuesto?  @relation(fields: [presupuestoId], references: [id])
   detalles       DetalleVenta[]
 }
 
@@ -506,13 +509,19 @@ model Presupuesto {
   total          Float
   validezDias    Int                  @default(15)
   configuracionSnapshot String        @default("{}")
+  estado         String               @default("ABIERTO")
+  venceEn        DateTime?
+  actualizadoEn  DateTime             @updatedAt
+  politicaRecalculo String             @default("CONSERVAR")
   
   cliente        Cliente              @relation(fields: [clienteId], references: [id])
   sucursal       Sucursal             @relation(fields: [sucursalId], references: [id])
   detalles       DetallePresupuesto[]
   reservas       ReservaStock[]
+  venta          Venta?
 
   @@index([sucursalId])
+  @@index([estado, venceEn])
 }
 
 model DetallePresupuesto {
@@ -520,17 +529,20 @@ model DetallePresupuesto {
   presupuestoId  Int
   productoId     Int
   varianteId     Int?
+  presentacionId Int?
   
   cantidad       Float
   cantidadSolicitada Float?
   cantidadPresentacion Float?
   conversionSnapshot String @default("{}")
   precioUnitario Float
+  descuento      Float       @default(0)
   subtotal       Float
   
   presupuesto    Presupuesto @relation(fields: [presupuestoId], references: [id], onDelete: Cascade)
   producto       Producto    @relation(fields: [productoId], references: [id])
   variante       VarianteProducto? @relation(fields: [varianteId], references: [id])
+  presentacion   PresentacionVariante? @relation(fields: [presentacionId], references: [id])
   lineasReserva  LineaReservaStock[]
 }
 
