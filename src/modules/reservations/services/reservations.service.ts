@@ -30,7 +30,8 @@ export async function createManualReservation(input: { quotationId: number; line
       const allocations = allocateReservation(request.quantity, inventories.map((item) => ({ id: item.id, physical: item.stockActual, reserved: item.stockReservado })));
       for (const allocation of allocations) {
         const inventory = inventories.find((item) => item.id === allocation.inventoryId)!;
-        await tx.inventario.update({ where: { id: inventory.id }, data: { stockReservado: { increment: allocation.quantity } } });
+        const claimedStock = await tx.inventario.updateMany({ where: { id: inventory.id, stockActual: inventory.stockActual, stockReservado: inventory.stockReservado }, data: { stockReservado: { increment: allocation.quantity } } });
+        if (claimedStock.count !== 1) throw new Error("El stock cambió por otra operación. Actualice y vuelva a intentar.");
         await tx.lineaReservaStock.create({ data: { reservaId: header.id, detallePresupuestoId: detail.id, inventarioId: inventory.id, cantidad: allocation.quantity } });
         await recordInventoryMovement(tx, { inventoryId: inventory.id, variantId: detail.varianteId, userId: user.id, type: "RESERVA", quantity: allocation.quantity, baseUnit: detail.variante.unidadBase?.codigo ?? "UNIDAD", previousBalance: inventory.stockActual, resultingBalance: inventory.stockActual, reason: `Reserva manual del presupuesto ${quotation.id}`, referenceType: "RESERVA", referenceId: header.id.toString() });
         await syncMinimumStockAlert(tx, inventory.id, user.id);
