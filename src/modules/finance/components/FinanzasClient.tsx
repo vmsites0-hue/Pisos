@@ -17,6 +17,7 @@ import {
 import { registrarPagoCliente } from "@/modules/finance/actions/payments.actions";
 import { registrarGasto, eliminarGasto } from "@/modules/finance/actions/expenses.actions";
 import { registerInstallmentPayment } from "@/modules/credit/actions/installment-payments.actions";
+import { summarizeFinances } from "@/modules/finance/domain/financial-summary";
 
 interface FinanzasClientProps {
   sales: any[];
@@ -24,9 +25,11 @@ interface FinanzasClientProps {
   gastos: any[];
   credits: any[];
   movements: any[];
+  users: Array<{ id: number; nombre: string }>;
+  filters: { from?: string; to?: string; userId?: number; paymentMethod?: string };
 }
 
-export function FinanzasClient({ sales, debtorClients, gastos, credits, movements }: FinanzasClientProps) {
+export function FinanzasClient({ sales, debtorClients, gastos, credits, movements, users, filters }: FinanzasClientProps) {
   // Modal de cobro de clientes
   const [isCobroModalOpen, setIsCobroModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
@@ -53,6 +56,7 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
 
   // Saldo Neto Diario / Balance General
   const saldoNeto = totalRevenue - totalGastos;
+  const summary = summarizeFinances(sales, movements, totalCuentasPorCobrar);
 
   // Formateador de moneda (Gs.)
   const formatMoney = (val: number) => {
@@ -139,6 +143,20 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
           <span>Registrar Gasto</span>
         </button>
       </div>
+
+      <section className="rounded-xl border bg-white p-4">
+        <form className="grid gap-2 md:grid-cols-5">
+          <input type="date" name="from" defaultValue={filters.from} className="rounded border p-2 text-xs" aria-label="Desde" />
+          <input type="date" name="to" defaultValue={filters.to} className="rounded border p-2 text-xs" aria-label="Hasta" />
+          <select name="userId" defaultValue={filters.userId ?? ""} className="rounded border p-2 text-xs"><option value="">Todos los usuarios</option>{users.map((user) => <option key={user.id} value={user.id}>{user.nombre}</option>)}</select>
+          <select name="paymentMethod" defaultValue={filters.paymentMethod ?? ""} className="rounded border p-2 text-xs"><option value="">Todos los métodos</option><option>EFECTIVO</option><option>TARJETA</option><option>TRANSFERENCIA</option><option>CREDITO</option></select>
+          <button className="rounded bg-slate-900 p-2 text-xs font-semibold text-white">Consultar período</button>
+        </form>
+        <div className="mt-4 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+          {[["Ventas brutas", summary.grossSales], ["Descuentos", summary.discounts], ["Devoluciones", summary.returns], ["Ventas netas", summary.netSales], ["Cobros", summary.collections], ["Cuentas por cobrar", summary.accountsReceivable], ["Gastos", summary.expenses], ["Saldo de caja", summary.cashBalance]].map(([label, value]) => <div key={String(label)} className="rounded border p-3"><span className="block text-slate-500">{label}</span><strong>{formatMoney(Number(value))}</strong></div>)}
+        </div>
+        <p className="mt-2 text-[10px] text-slate-500">El local principal se aplica internamente; no existe filtro multisucursal.</p>
+      </section>
 
       {/* Widgets de Flujo de Caja */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
