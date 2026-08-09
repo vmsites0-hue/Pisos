@@ -431,7 +431,7 @@ export function InventarioClient({ products, categories, families, brands, units
                           {stockDisponible} {inv.producto.unidadVenta}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right text-slate-500">{inv.producto.stockMinimo} {inv.producto.unidadVenta}</td>
+                      <td className="px-6 py-4 text-right text-slate-500">{inv.variante?.stockMinimo ?? inv.producto.stockMinimo} {inv.variante?.unidadBase?.simbolo ?? inv.producto.unidadVenta}</td>
                     </tr>
                   );
                 })

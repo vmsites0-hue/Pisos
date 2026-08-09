@@ -113,7 +113,7 @@ export async function createProducto(formData: FormData) {
         stockMinimo,
         imagenUrl,
         imagenes: { create: images },
-        variantes: { create: { sku: codigo, codigoBarras, precioCompra, precioVenta, unidadBaseId: commerce.unidadBaseId, politicaVenta: commerce.politicaVenta, multiploVenta: commerce.multiploVenta, valores: { create: variantValues }, presentaciones: { create: commerce.presentations } } },
+        variantes: { create: { sku: codigo, codigoBarras, precioCompra, precioVenta, stockMinimo, unidadBaseId: commerce.unidadBaseId, politicaVenta: commerce.politicaVenta, multiploVenta: commerce.multiploVenta, valores: { create: variantValues }, presentaciones: { create: commerce.presentations } } },
       },
     });
 
@@ -192,11 +192,11 @@ export async function updateProducto(id: number, formData: FormData) {
       if (primaryVariant) {
         await tx.varianteProducto.update({
           where: { id: primaryVariant.id },
-          data: { sku: codigo, codigoBarras, precioCompra, precioVenta, unidadBaseId: commerce.unidadBaseId, politicaVenta: commerce.politicaVenta, multiploVenta: commerce.multiploVenta, valores: { deleteMany: {}, create: variantValues }, presentaciones: { deleteMany: {}, create: commerce.presentations } },
+          data: { sku: codigo, codigoBarras, precioCompra, precioVenta, stockMinimo, unidadBaseId: commerce.unidadBaseId, politicaVenta: commerce.politicaVenta, multiploVenta: commerce.multiploVenta, valores: { deleteMany: {}, create: variantValues }, presentaciones: { deleteMany: {}, create: commerce.presentations } },
         });
       } else {
         await tx.varianteProducto.create({
-          data: { productoId: id, sku: codigo, codigoBarras, precioCompra, precioVenta, unidadBaseId: commerce.unidadBaseId, politicaVenta: commerce.politicaVenta, multiploVenta: commerce.multiploVenta, valores: { create: variantValues }, presentaciones: { create: commerce.presentations } },
+          data: { productoId: id, sku: codigo, codigoBarras, precioCompra, precioVenta, stockMinimo, unidadBaseId: commerce.unidadBaseId, politicaVenta: commerce.politicaVenta, multiploVenta: commerce.multiploVenta, valores: { create: variantValues }, presentaciones: { create: commerce.presentations } },
         });
       }
     });
