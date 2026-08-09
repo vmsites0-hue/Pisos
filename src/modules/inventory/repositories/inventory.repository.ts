@@ -2,12 +2,14 @@ import { prisma } from "@/lib/prisma";
 import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 
 export async function getInventoryPageData() {
-  const [products, categories, branches, inventory] = await Promise.all([
+  const [products, categories, families, brands, branches, inventory] = await Promise.all([
     prisma.producto.findMany({
-      include: { categoria: true },
+      include: { categoria: true, familia: true, marcaCatalogo: true },
       orderBy: { creadoEn: "desc" },
     }),
     prisma.categoria.findMany({ orderBy: { nombre: "asc" } }),
+    prisma.familia.findMany({ where: { activa: true }, orderBy: { nombre: "asc" } }),
+    prisma.marca.findMany({ where: { activa: true }, orderBy: { nombre: "asc" } }),
     getMainBranch().then((branch) => [branch]),
     prisma.inventario.findMany({
       where: { sucursal: { esPrincipal: true, activa: true } },
@@ -16,5 +18,5 @@ export async function getInventoryPageData() {
     }),
   ]);
 
-  return { products, categories, branches, inventory };
+  return { products, categories, families, brands, branches, inventory };
 }
