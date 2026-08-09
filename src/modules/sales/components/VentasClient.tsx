@@ -23,6 +23,7 @@ import { calcularDescuentoAutomatico } from "@/modules/discounts/actions/discoun
 import { availableStock, matchesCatalogQuery } from "@/modules/sales/domain/catalog-search";
 import { cancelSaleAction } from "@/modules/returns/actions/sale-cancellations.actions";
 import { registerReturnAction } from "@/modules/returns/actions/returns.actions";
+import { simulateCredit } from "@/modules/credit/actions/credit-schedules.actions";
 
 interface VentasClientProps {
   products: any[];
@@ -30,9 +31,10 @@ interface VentasClientProps {
   sucursales: any[];
   inventarios: any[];
   clientes: any[];
+  creditPlans: any[];
 }
 
-export function VentasClient({ products, categories, sucursales, inventarios, clientes }: VentasClientProps) {
+export function VentasClient({ products, categories, sucursales, inventarios, clientes, creditPlans }: VentasClientProps) {
   // Selección de Sucursal activa para la venta
   const [sucursalId, setSucursalId] = useState<number>(0);
   
@@ -46,6 +48,8 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
   const [reglaAplicadaId, setReglaAplicadaId] = useState<number | null>(null);
   const [metodoPago, setMetodoPago] = useState<string>("EFECTIVO");
   const [tipoEntrega, setTipoEntrega] = useState<string>("ENVIO");
+  const [creditPlanId, setCreditPlanId] = useState<number>(creditPlans[0]?.id ?? 0);
+  const [creditSimulation, setCreditSimulation] = useState<any>(null);
   const [approvalId, setApprovalId] = useState("");
   const [exceptionReason, setExceptionReason] = useState("");
 
@@ -333,6 +337,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
       descuentoAutomatico: descuentoAuto,
       approvalId: approvalId ? Number(approvalId) : null,
       exceptionReason,
+      creditPlanId: metodoPago === "CREDITO" ? creditPlanId : null,
       metodoPago,
       tipoEntrega,
       detalles: cart.map(item => ({
@@ -724,6 +729,9 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
                   {formatMoney(creditoDisponible)}
                 </span>
               </div>
+              <div className="grid grid-cols-[1fr_auto] gap-1 border-t border-blue-200 pt-2"><select value={creditPlanId} onChange={(event) => { setCreditPlanId(Number(event.target.value)); setCreditSimulation(null); }} className="rounded border bg-white p-1 text-xs">{creditPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.nombre} · {plan.sistema} · {plan.numeroCuotas} cuotas</option>)}</select><button type="button" onClick={async () => setCreditSimulation(await simulateCredit({ planId: creditPlanId, principal: total }))} className="rounded bg-blue-900 px-2 text-white">Simular</button></div>
+              {creditSimulation?.error && <p className="text-red-700">{creditSimulation.error}</p>}
+              {creditSimulation?.installments && <div className="max-h-28 overflow-auto rounded bg-white p-1"><p className="font-semibold">Interés: {formatMoney(creditSimulation.totalInterest)} · Total: {formatMoney(creditSimulation.total)}</p>{creditSimulation.installments.map((installment: any) => <p key={installment.number}>#{installment.number} {new Date(installment.dueDate).toLocaleDateString("es-PY")} · capital {formatMoney(installment.capital)} · interés {formatMoney(installment.interest)} · cuota {formatMoney(installment.payment)} · saldo {formatMoney(installment.balance)}</p>)}</div>}
               {creditoExcedido && (
                 <div className="text-[10px] text-red-600 font-bold mt-1.5 flex items-center gap-1">
                   <AlertTriangle size={12} />

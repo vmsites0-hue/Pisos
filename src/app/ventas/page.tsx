@@ -4,7 +4,7 @@ import { requireAuthenticatedUser } from "@/modules/auth/services/session.servic
 
 export default async function VentasPage() {
   await requireAuthenticatedUser();
-  const { branches, categories, customers, products, inventory } = await getSalesPageData();
+  const { branches, categories, customers, products, inventory, creditPlans } = await getSalesPageData();
 
   return (
     <VentasClient
@@ -13,6 +13,7 @@ export default async function VentasPage() {
       sucursales={branches}
       inventarios={inventory}
       clientes={customers}
+      creditPlans={creditPlans}
     />
   );
 }
