@@ -79,11 +79,44 @@ async function main() {
     });
   }
 
-  for (const name of ["Pisos", "Juegos de baño", "Griferías", "Adhesivos", "Otros"]) {
+  const familyByCategory = {
+    Pisos: "Pisos",
+    "Juegos de baño": "Baño",
+    Griferías: "Baño",
+    Adhesivos: "Complementos",
+    Otros: "Otros",
+  };
+  for (const familyName of [...new Set(Object.values(familyByCategory))]) {
+    await prisma.familia.upsert({
+      where: { nombre: familyName },
+      update: { activa: true },
+      create: { nombre: familyName, activa: true },
+    });
+  }
+  for (const [name, familyName] of Object.entries(familyByCategory)) {
+    const family = await prisma.familia.findUniqueOrThrow({ where: { nombre: familyName } });
     await prisma.categoria.upsert({
       where: { nombre: name },
-      update: {},
-      create: { nombre: name },
+      update: { familiaId: family.id, activa: true },
+      create: { nombre: name, familiaId: family.id, activa: true },
+    });
+  }
+
+  const floorFamily = await prisma.familia.findUniqueOrThrow({ where: { nombre: "Pisos" } });
+  const floorAttributes = [
+    ["ANCHO", "Ancho", "NUMERO", true, true, true, null],
+    ["LARGO", "Largo", "NUMERO", true, true, true, null],
+    ["ESPESOR", "Espesor", "NUMERO", false, true, true, null],
+    ["TONO", "Tono", "TEXTO", false, true, true, null],
+    ["CALIBRE", "Calibre", "TEXTO", false, true, true, null],
+    ["COLOR", "Color", "TEXTO", false, true, true, null],
+    ["ACABADO", "Acabado", "SELECCION", false, true, true, JSON.stringify(["Mate", "Brillante", "Satinado"])],
+  ];
+  for (const [key, name, type, required, filterable, identity, options] of floorAttributes) {
+    await prisma.atributoFamilia.upsert({
+      where: { familiaId_clave: { familiaId: floorFamily.id, clave: key } },
+      update: { nombre: name, tipo: type, obligatorio: required, filtrable: filterable, identidad: identity, opciones: options },
+      create: { familiaId: floorFamily.id, clave: key, nombre: name, tipo: type, obligatorio: required, filtrable: filterable, identidad: identity, opciones: options },
     });
   }
 

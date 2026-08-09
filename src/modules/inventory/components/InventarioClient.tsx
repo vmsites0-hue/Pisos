@@ -22,16 +22,21 @@ import { deleteProducto } from "@/modules/inventory/actions/products.actions";
 interface InventarioClientProps {
   products: any[];
   categories: any[];
+  families: any[];
+  brands: any[];
+  units: any[];
   sucursales: any[];
   inventarios: any[];
 }
 
-export function InventarioClient({ products, categories, sucursales, inventarios }: InventarioClientProps) {
+export function InventarioClient({ products, categories, families, brands, units, sucursales, inventarios }: InventarioClientProps) {
   const [activeTab, setActiveTab] = useState<"catalogo" | "stock">("catalogo");
   
   // Filtros y búsquedas
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [familyFilter, setFamilyFilter] = useState("all");
+  const [brandFilter, setBrandFilter] = useState("all");
   const [sucursalFilter, setSucursalFilter] = useState("all");
 
   // Modales
@@ -59,8 +64,10 @@ export function InventarioClient({ products, categories, sucursales, inventarios
       (prod.marca && prod.marca.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const matchesCategory = categoryFilter === "all" || prod.categoriaId === parseInt(categoryFilter);
+    const matchesFamily = familyFilter === "all" || prod.familiaId === parseInt(familyFilter);
+    const matchesBrand = brandFilter === "all" || prod.marcaId === parseInt(brandFilter);
 
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && matchesFamily && matchesBrand;
   });
 
   // Filtrar detalles de stock
@@ -179,7 +186,7 @@ export function InventarioClient({ products, categories, sucursales, inventarios
         </div>
 
         {activeTab === "catalogo" ? (
-          /* Filtro de Categoría */
+          <>
           <div className="flex items-center gap-2 bg-slate-50 border rounded-md px-3 py-1.5">
             <Filter size={16} className="text-slate-400" />
             <select
@@ -193,6 +200,13 @@ export function InventarioClient({ products, categories, sucursales, inventarios
               ))}
             </select>
           </div>
+          <select value={familyFilter} onChange={(event) => setFamilyFilter(event.target.value)} className="rounded-md border bg-white px-3 py-1.5 text-sm">
+            <option value="all">Todas las familias</option>{families.map((family) => <option key={family.id} value={family.id}>{family.nombre}</option>)}
+          </select>
+          <select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)} className="rounded-md border bg-white px-3 py-1.5 text-sm">
+            <option value="all">Todas las marcas</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.nombre}</option>)}
+          </select>
+          </>
         ) : (
           <div className="flex items-center gap-2 bg-slate-50 border rounded-md px-3 py-1.5 text-sm text-slate-700">
             <Store size={16} className="text-slate-400" />
@@ -428,6 +442,7 @@ export function InventarioClient({ products, categories, sucursales, inventarios
         onClose={() => { setIsProductModalOpen(false); setSelectedProduct(null); }}
         product={selectedProduct}
         categories={categories}
+        units={units}
       />
 
       {/* Modal de Ajuste de Stock */}

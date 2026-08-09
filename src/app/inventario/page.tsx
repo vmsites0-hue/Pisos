@@ -4,12 +4,15 @@ import { requireAuthenticatedUser } from "@/modules/auth/services/session.servic
 
 export default async function InventarioPage() {
   await requireAuthenticatedUser();
-  const { products, categories, branches, inventory } = await getInventoryPageData();
+  const { products, categories, families, brands, units, branches, inventory } = await getInventoryPageData();
 
   return (
     <InventarioClient
       products={products}
       categories={categories}
+      families={families}
+      brands={brands}
+      units={units}
       sucursales={branches}
       inventarios={inventory}
     />

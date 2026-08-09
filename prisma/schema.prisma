@@ -159,6 +159,43 @@ model Sucursal {
 model Categoria {
   id          Int        @id @default(autoincrement())
   nombre      String     @unique
+  activa      Boolean    @default(true)
+  familiaId   Int?
+  familia     Familia?   @relation(fields: [familiaId], references: [id])
+  productos   Producto[]
+}
+
+model Familia {
+  id          Int         @id @default(autoincrement())
+  nombre      String      @unique
+  activa      Boolean     @default(true)
+  categorias  Categoria[]
+  productos   Producto[]
+  atributos   AtributoFamilia[]
+}
+
+model AtributoFamilia {
+  id          Int      @id @default(autoincrement())
+  familiaId   Int
+  clave       String
+  nombre      String
+  tipo        String
+  obligatorio Boolean  @default(false)
+  filtrable   Boolean  @default(false)
+  identidad   Boolean  @default(false)
+  opciones    String?
+  activo      Boolean  @default(true)
+
+  familia Familia @relation(fields: [familiaId], references: [id], onDelete: Cascade)
+  valores VarianteAtributoValor[]
+
+  @@unique([familiaId, clave])
+}
+
+model Marca {
+  id          Int        @id @default(autoincrement())
+  nombre      String     @unique
+  activa      Boolean    @default(true)
   productos   Producto[]
 }
 
@@ -169,6 +206,8 @@ model Producto {
   nombre            String
   descripcion       String?
   marca             String?
+  familiaId         Int?
+  marcaId           Int?
   categoriaId       Int
   unidadVenta       String               @default("UNIDAD")
   imagenUrl         String?
@@ -185,9 +224,94 @@ model Producto {
   actualizado       DateTime             @updatedAt
 
   categoria         Categoria            @relation(fields: [categoriaId], references: [id])
+  familia           Familia?              @relation(fields: [familiaId], references: [id])
+  marcaCatalogo     Marca?                @relation(fields: [marcaId], references: [id])
   inventarios       Inventario[]
   detallesVenta     DetalleVenta[]
   detallesPresupuesto DetallePresupuesto[]
+  variantes         VarianteProducto[]
+  imagenes          ProductoImagen[]
+}
+
+model ProductoImagen {
+  id         Int     @id @default(autoincrement())
+  productoId Int
+  url        String
+  textoAlt   String?
+  orden      Int     @default(0)
+  principal  Boolean @default(false)
+
+  producto Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  @@unique([productoId, url])
+  @@index([productoId, orden])
+}
+
+model VarianteProducto {
+  id             Int      @id @default(autoincrement())
+  productoId     Int
+  sku            String   @unique
+  codigoBarras   String?  @unique
+  nombre          String?
+  precioCompra   Float
+  precioVenta    Float
+  activa          Boolean  @default(true)
+  creadoEn        DateTime @default(now())
+  actualizado     DateTime @updatedAt
+  unidadBaseId    Int?
+  politicaVenta   String   @default("UNIDADES_ENTERAS")
+  multiploVenta   Float?
+
+  producto Producto                @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  unidadBase UnidadMedida?         @relation("UnidadBaseVariante", fields: [unidadBaseId], references: [id])
+  valores  VarianteAtributoValor[]
+  presentaciones PresentacionVariante[]
+
+  @@index([productoId])
+}
+
+model UnidadMedida {
+  id               Int     @id @default(autoincrement())
+  codigo           String  @unique
+  nombre           String
+  simbolo          String
+  precision        Int     @default(2)
+  admiteDecimales  Boolean @default(true)
+  activa           Boolean @default(true)
+
+  variantesBase VarianteProducto[]    @relation("UnidadBaseVariante")
+  presentaciones PresentacionVariante[]
+}
+
+model PresentacionVariante {
+  id               Int      @id @default(autoincrement())
+  varianteId       Int
+  unidadId         Int
+  nombre           String
+  factorConversion Float
+  piezas           Int?
+  descripcion      String?
+  predeterminada   Boolean  @default(false)
+  activa           Boolean  @default(true)
+
+  variante VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
+  unidad UnidadMedida       @relation(fields: [unidadId], references: [id])
+
+  @@unique([varianteId, nombre])
+  @@index([unidadId])
+}
+
+model VarianteAtributoValor {
+  id          Int @id @default(autoincrement())
+  varianteId  Int
+  atributoId  Int
+  valor       String
+
+  variante VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
+  atributo AtributoFamilia   @relation(fields: [atributoId], references: [id], onDelete: Restrict)
+
+  @@unique([varianteId, atributoId])
+  @@index([atributoId])
 }
 
 // ==========================================
@@ -272,6 +396,9 @@ model DetalleVenta {
   productoId     Int
   
   cantidad       Float     // Puede ser m2 o cajas
+  cantidadSolicitada Float?
+  cantidadPresentacion Float?
+  conversionSnapshot String @default("{}")
   precioUnitario Float
   subtotal       Float
   
@@ -307,6 +434,9 @@ model DetallePresupuesto {
   productoId     Int
   
   cantidad       Float
+  cantidadSolicitada Float?
+  cantidadPresentacion Float?
+  conversionSnapshot String @default("{}")
   precioUnitario Float
   subtotal       Float
   

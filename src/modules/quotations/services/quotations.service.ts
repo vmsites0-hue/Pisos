@@ -4,6 +4,7 @@ import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 import { getSystemParameterSnapshot } from "@/modules/settings/services/system-parameters.service";
+import { calculateProductQuantity } from "@/modules/inventory/domain/quantity-conversion";
 
 export interface DetallePresupuestoInput {
   productoId: number;
@@ -43,17 +44,22 @@ export async function crearPresupuesto(input: PresupuestoInput) {
     for (const item of detalles) {
       const producto = await prisma.producto.findUnique({
         where: { id: item.productoId },
+        include: { variantes: { where: { activa: true }, orderBy: { id: "asc" }, take: 1, include: { unidadBase: true, presentaciones: { where: { activa: true }, include: { unidad: true } } } } },
       });
       if (!producto) {
         return { error: `El producto con ID ${item.productoId} no existe.` };
       }
 
-      const itemSubtotal = item.cantidad * item.precioUnitario;
+      const conversion = calculateProductQuantity(producto, item.cantidad);
+      const itemSubtotal = conversion.actualQuantity * item.precioUnitario;
       subtotal += itemSubtotal;
 
       detallesToCreate.push({
         productoId: item.productoId,
-        cantidad: item.cantidad,
+        cantidad: conversion.actualQuantity,
+        cantidadSolicitada: conversion.requestedQuantity,
+        cantidadPresentacion: conversion.presentationQuantity,
+        conversionSnapshot: JSON.stringify(conversion),
         precioUnitario: item.precioUnitario,
         subtotal: itemSubtotal,
       });
