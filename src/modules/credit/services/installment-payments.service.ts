@@ -4,6 +4,7 @@ import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { applyInstallmentPayment } from "@/modules/credit/domain/installment-payment";
 import { recordAudit } from "@/modules/audit/services/audit.service";
+import { recordFinancialMovement } from "@/modules/finance/services/financial-movements.service";
 
 const PAYMENT_METHODS = ["EFECTIVO", "TARJETA", "TRANSFERENCIA"];
 export async function registerInstallmentPayment(input: { installmentId: number; amount: number; paymentMethod: string }) {
@@ -18,6 +19,7 @@ export async function registerInstallmentPayment(input: { installmentId: number;
       const creditBalance = Math.max(0, installment.creditoVenta.saldoPendiente - input.amount);
       await tx.creditoVenta.update({ where: { id: installment.creditoVenta.id }, data: { saldoPendiente: creditBalance, estado: creditBalance <= 0.000001 ? "PAGADO" : "ACTIVO" } });
       await tx.cliente.update({ where: { id: installment.creditoVenta.venta.clienteId }, data: { saldoDeudor: Math.max(0, installment.creditoVenta.venta.cliente.saldoDeudor - input.amount) } });
+      await recordFinancialMovement(tx, { type: "INGRESO", category: "COBRO_CREDITO", amount: input.amount, affectsResult: false, affectsCash: true, paymentMethod: input.paymentMethod, userId: actor.id, referenceType: "PAGO_CUOTA", referenceId: created.id, description: `Cobro de cuota #${installment.numero}` });
       await recordAudit({ userId: actor.id, action: "COBRO_CUOTA_REGISTRADO", entity: "PagoCuota", entityId: created.id, after: { cuotaId: installment.id, monto: input.amount, metodoPago: input.paymentMethod, estadoCuota: applied.state } }, tx);
       return created;
     });
