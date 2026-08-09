@@ -171,6 +171,24 @@ model Familia {
   activa      Boolean     @default(true)
   categorias  Categoria[]
   productos   Producto[]
+  atributos   AtributoFamilia[]
+}
+
+model AtributoFamilia {
+  id          Int      @id @default(autoincrement())
+  familiaId   Int
+  clave       String
+  nombre      String
+  tipo        String
+  obligatorio Boolean  @default(false)
+  filtrable   Boolean  @default(false)
+  identidad   Boolean  @default(false)
+  opciones    String?
+  activo      Boolean  @default(true)
+
+  familia Familia @relation(fields: [familiaId], references: [id], onDelete: Cascade)
+
+  @@unique([familiaId, clave])
 }
 
 model Marca {
