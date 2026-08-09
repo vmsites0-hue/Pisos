@@ -420,7 +420,7 @@ export function InventarioClient({ products, categories, families, brands, units
                       </td>
                       {/* Equivalente en Cajas */}
                       <td className="px-6 py-4 text-right text-slate-500">
-                        {cajasEquiv}
+                        {inv.variante && presentation ? <><span>{inv.presentacionesCerradas} cerradas</span>{inv.remanenteAbierto > 0 && <span className="block text-xs text-amber-700">Remanente: {inv.remanenteAbierto} {inv.variante.unidadBase?.simbolo}</span>}</> : cajasEquiv}
                       </td>
 
                       {/* Disponible */}
