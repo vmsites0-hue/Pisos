@@ -4,10 +4,10 @@ import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 export async function getInventoryPageData() {
   const [products, categories, families, brands, branches, inventory] = await Promise.all([
     prisma.producto.findMany({
-      include: { categoria: true, familia: true, marcaCatalogo: true },
+      include: { categoria: true, familia: true, marcaCatalogo: true, variantes: { include: { valores: { include: { atributo: true } } } } },
       orderBy: { creadoEn: "desc" },
     }),
-    prisma.categoria.findMany({ orderBy: { nombre: "asc" } }),
+    prisma.categoria.findMany({ include: { familia: { include: { atributos: { where: { activo: true }, orderBy: { nombre: "asc" } } } } }, orderBy: { nombre: "asc" } }),
     prisma.familia.findMany({ where: { activa: true }, orderBy: { nombre: "asc" } }),
     prisma.marca.findMany({ where: { activa: true }, orderBy: { nombre: "asc" } }),
     getMainBranch().then((branch) => [branch]),
