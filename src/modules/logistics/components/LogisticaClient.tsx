@@ -36,6 +36,7 @@ export function LogisticaClient({ sales, sucursales, employees }: LogisticaClien
   const [chofer, setChofer] = useState(0);
   const [encargado, setEncargado] = useState(0);
   const [observaciones, setObservaciones] = useState("");
+  const [evidenciaUrl, setEvidenciaUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Filtrar ventas
@@ -61,6 +62,7 @@ export function LogisticaClient({ sales, sucursales, employees }: LogisticaClien
     setChofer(0);
     setEncargado(0);
     setObservaciones("");
+    setEvidenciaUrl("");
     setIsModalOpen(true);
   };
 
@@ -86,7 +88,8 @@ export function LogisticaClient({ sales, sucursales, employees }: LogisticaClien
       selectedSaleId, 
       modalType, 
       undefined,
-      finalObservacion ? finalObservacion : undefined
+      finalObservacion ? finalObservacion : undefined,
+      modalType === "ENTREGADO" ? evidenciaUrl : undefined,
     );
     
     setLoading(false);
@@ -362,6 +365,7 @@ export function LogisticaClient({ sales, sucursales, employees }: LogisticaClien
                   className="w-full border rounded p-2 text-sm bg-white outline-none focus:border-slate-400"
                 />
               </div>
+              {modalType === "ENTREGADO" && <div><label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Imagen de evidencia (opcional)</label><input type="url" value={evidenciaUrl} onChange={(event) => setEvidenciaUrl(event.target.value)} placeholder="https://..." className="w-full rounded border p-2 text-sm" /></div>}
 
               <div className="flex justify-end gap-3 pt-4 border-t mt-6 font-semibold">
                 <button
