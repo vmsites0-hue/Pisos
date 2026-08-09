@@ -13,9 +13,11 @@ interface ClienteFormProps {
 export function ClienteForm({ isOpen, onClose, cliente }: ClienteFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tipo, setTipo] = useState(cliente?.tipo ?? "PERSONA");
 
   useEffect(() => {
     setError(null);
+    setTipo(cliente?.tipo ?? "PERSONA");
   }, [cliente, isOpen]);
 
   if (!isOpen) return null;
@@ -63,12 +65,14 @@ export function ClienteForm({ isOpen, onClose, cliente }: ClienteFormProps) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div><label className="block text-sm font-medium text-slate-700 mb-1">Tipo de cliente</label><select name="tipo" value={tipo} onChange={(event) => setTipo(event.target.value)} className="w-full rounded-md border bg-white p-2 text-sm"><option value="PERSONA">Persona</option><option value="EMPRESA">Empresa</option></select></div>
+          {tipo === "EMPRESA" && <div><label className="block text-sm font-medium text-slate-700 mb-1">Razón social *</label><input required name="razonSocial" defaultValue={cliente?.razonSocial || cliente?.nombre || ""} className="w-full rounded-md border p-2 text-sm" /></div>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Nombre */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
               <input
-                required
+                required={tipo === "PERSONA"}
                 name="nombre"
                 type="text"
                 defaultValue={cliente?.nombre || ""}
@@ -81,7 +85,7 @@ export function ClienteForm({ isOpen, onClose, cliente }: ClienteFormProps) {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Apellido *</label>
               <input
-                required
+                required={tipo === "PERSONA"}
                 name="apellido"
                 type="text"
                 defaultValue={cliente?.apellido || ""}

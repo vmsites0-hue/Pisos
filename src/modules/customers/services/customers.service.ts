@@ -3,13 +3,19 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { getMainBranch } from "@/modules/branches/services/main-branch.service";
+import { validateCustomerIdentity } from "@/modules/customers/domain/customer";
+import { recordAudit } from "@/modules/audit/services/audit.service";
 
 export async function createCliente(formData: FormData) {
-  await requirePermission(PERMISSIONS.CUSTOMERS_MANAGE);
+  const actor = await requirePermission(PERMISSIONS.CUSTOMERS_MANAGE);
   const mainBranch = await getMainBranch();
   try {
-    const nombre = (formData.get("nombre") as string)?.trim();
-    const apellido = (formData.get("apellido") as string)?.trim();
+    const tipo = String(formData.get("tipo") ?? "PERSONA");
+    const razonSocial = String(formData.get("razonSocial") ?? "").trim() || null;
+    const nombrePersona = String(formData.get("nombre") ?? "").trim();
+    const apellidoPersona = String(formData.get("apellido") ?? "").trim();
+    const nombre = tipo === "EMPRESA" ? razonSocial ?? "" : nombrePersona;
+    const apellido = tipo === "EMPRESA" ? "" : apellidoPersona;
     const documento = (formData.get("documento") as string)?.trim();
     const ruc = (formData.get("ruc") as string)?.trim() || null;
     const telefono = (formData.get("telefono") as string)?.trim() || null;
@@ -19,9 +25,7 @@ export async function createCliente(formData: FormData) {
     const limiteCreditoRaw = formData.get("limiteCredito") as string;
     const limiteCredito = limiteCreditoRaw ? parseFloat(limiteCreditoRaw) : 0;
 
-    if (!nombre || !apellido || !documento) {
-      return { error: "Faltan campos obligatorios (Nombre, Apellido y Documento)." };
-    }
+    validateCustomerIdentity({ type: tipo, name: nombrePersona, lastName: apellidoPersona, legalName: razonSocial ?? "", document: documento, taxId: ruc });
 
     // Verificar unicidad de Documento
     const existeDocumento = await prisma.cliente.findUnique({
@@ -46,6 +50,8 @@ export async function createCliente(formData: FormData) {
         sucursalId: mainBranch.id,
         nombre,
         apellido,
+        tipo,
+        razonSocial,
         documento,
         ruc,
         telefono,
@@ -55,6 +61,7 @@ export async function createCliente(formData: FormData) {
         saldoDeudor: 0,
       },
     });
+    await recordAudit({ userId: actor.id, action: "CLIENTE_CREADO", entity: "Cliente", entityId: nuevoCliente.id, after: nuevoCliente });
 
     revalidatePath("/clientes");
     return { success: true, cliente: nuevoCliente };
@@ -64,10 +71,14 @@ export async function createCliente(formData: FormData) {
 }
 
 export async function updateCliente(id: number, formData: FormData) {
-  await requirePermission(PERMISSIONS.CUSTOMERS_MANAGE);
+  const actor = await requirePermission(PERMISSIONS.CUSTOMERS_MANAGE);
   try {
-    const nombre = (formData.get("nombre") as string)?.trim();
-    const apellido = (formData.get("apellido") as string)?.trim();
+    const tipo = String(formData.get("tipo") ?? "PERSONA");
+    const razonSocial = String(formData.get("razonSocial") ?? "").trim() || null;
+    const nombrePersona = String(formData.get("nombre") ?? "").trim();
+    const apellidoPersona = String(formData.get("apellido") ?? "").trim();
+    const nombre = tipo === "EMPRESA" ? razonSocial ?? "" : nombrePersona;
+    const apellido = tipo === "EMPRESA" ? "" : apellidoPersona;
     const documento = (formData.get("documento") as string)?.trim();
     const ruc = (formData.get("ruc") as string)?.trim() || null;
     const telefono = (formData.get("telefono") as string)?.trim() || null;
@@ -77,9 +88,7 @@ export async function updateCliente(id: number, formData: FormData) {
     const limiteCreditoRaw = formData.get("limiteCredito") as string;
     const limiteCredito = limiteCreditoRaw ? parseFloat(limiteCreditoRaw) : 0;
 
-    if (!nombre || !apellido || !documento) {
-      return { error: "Faltan campos obligatorios (Nombre, Apellido y Documento)." };
-    }
+    validateCustomerIdentity({ type: tipo, name: nombrePersona, lastName: apellidoPersona, legalName: razonSocial ?? "", document: documento, taxId: ruc });
 
     // Verificar unicidad de Documento (excluyendo al actual)
     const existeDocumento = await prisma.cliente.findFirst({
@@ -99,11 +108,15 @@ export async function updateCliente(id: number, formData: FormData) {
       }
     }
 
-    await prisma.cliente.update({
+    const before = await prisma.cliente.findUniqueOrThrow({ where: { id } });
+    const updated = await prisma.cliente.update({
       where: { id },
       data: {
         nombre,
         apellido,
+        tipo,
+        razonSocial,
+        activo: formData.get("activo") !== "false",
         documento,
         ruc,
         telefono,
@@ -112,6 +125,7 @@ export async function updateCliente(id: number, formData: FormData) {
         limiteCredito,
       },
     });
+    await recordAudit({ userId: actor.id, action: "CLIENTE_ACTUALIZADO", entity: "Cliente", entityId: id, before, after: updated });
 
     revalidatePath("/clientes");
     return { success: true };
@@ -121,20 +135,18 @@ export async function updateCliente(id: number, formData: FormData) {
 }
 
 export async function deleteCliente(id: number) {
-  await requirePermission(PERMISSIONS.CUSTOMERS_MANAGE);
+  const actor = await requirePermission(PERMISSIONS.CUSTOMERS_MANAGE);
   try {
     // Verificar si tiene ventas asociadas
-    const ventasCount = await prisma.venta.count({
-      where: { clienteId: id },
-    });
-
-    if (ventasCount > 0) {
-      return { error: "No se puede eliminar el cliente porque tiene ventas asociadas." };
+    const before = await prisma.cliente.findUniqueOrThrow({ where: { id } });
+    const [ventasCount, quotationsCount] = await Promise.all([prisma.venta.count({ where: { clienteId: id } }), prisma.presupuesto.count({ where: { clienteId: id } })]);
+    if (ventasCount + quotationsCount > 0) {
+      const after = await prisma.cliente.update({ where: { id }, data: { activo: false } });
+      await recordAudit({ userId: actor.id, action: "CLIENTE_DESACTIVADO", entity: "Cliente", entityId: id, before, after });
+      revalidatePath("/clientes"); return { success: true, deactivated: true };
     }
-
-    await prisma.cliente.delete({
-      where: { id },
-    });
+    await prisma.cliente.delete({ where: { id } });
+    await recordAudit({ userId: actor.id, action: "CLIENTE_ELIMINADO", entity: "Cliente", entityId: id, before });
 
     revalidatePath("/clientes");
     return { success: true };
