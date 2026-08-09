@@ -33,6 +33,7 @@ const permissions = [
   ["sales.create", "Confirmar ventas"],
   ["discounts.manage", "Administrar promociones"],
   ["logistics.update", "Actualizar entregas"],
+  ["delivery.assign", "Asignar encargados y choferes"],
   ["expenses.create", "Registrar gastos"],
   ["expenses.delete", "Eliminar gastos"],
   ["payments.create", "Registrar cobros"],
@@ -55,7 +56,7 @@ const rolePermissions = {
   ADMINISTRADOR: permissions.map(([code]) => code),
   VENDEDOR: ["customers.manage", "quotations.manage", "reservations.manage", "sales.create"],
   DEPOSITO: ["products.manage", "inventory.adjust", "reservations.manage"],
-  LOGISTICA: ["logistics.update"],
+  LOGISTICA: ["logistics.update", "delivery.assign"],
   CHOFER: ["logistics.update"],
   FINANZAS: ["expenses.create", "expenses.delete", "payments.create"],
 };

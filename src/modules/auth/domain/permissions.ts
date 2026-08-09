@@ -10,6 +10,7 @@ export const PERMISSIONS = {
   SALES_CREATE: "sales.create",
   DISCOUNTS_MANAGE: "discounts.manage",
   LOGISTICS_UPDATE: "logistics.update",
+  DELIVERY_ASSIGN: "delivery.assign",
   EXPENSES_CREATE: "expenses.create",
   EXPENSES_DELETE: "expenses.delete",
   PAYMENTS_CREATE: "payments.create",

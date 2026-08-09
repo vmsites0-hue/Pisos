@@ -14,14 +14,15 @@ import {
   AlertCircle,
   X
 } from "lucide-react";
-import { actualizarEstadoEnvio } from "@/modules/logistics/actions/logistics.actions";
+import { actualizarEstadoEnvio, asignarEntrega } from "@/modules/logistics/actions/logistics.actions";
 
 interface LogisticaClientProps {
   sales: any[];
   sucursales: any[];
+  employees: any[];
 }
 
-export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
+export function LogisticaClient({ sales, sucursales, employees }: LogisticaClientProps) {
   const [activeTab, setActiveTab] = useState<"PENDIENTE" | "EN_PREPARACION" | "LISTO_DESPACHO" | "EN_CAMINO" | "ENTREGADO" | "ENTREGA_FALLIDA" | "CANCELADO">("PENDIENTE");
   const [searchQuery, setSearchQuery] = useState("");
   const [sucursalFilter, setSucursalFilter] = useState("all");
@@ -32,8 +33,8 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
   
   // Inputs del modal
-  const [chofer, setChofer] = useState("");
-  const [encargado, setEncargado] = useState("");
+  const [chofer, setChofer] = useState(0);
+  const [encargado, setEncargado] = useState(0);
   const [observaciones, setObservaciones] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -57,8 +58,8 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
   const openTransitionModal = (saleId: number, type: "EN_PREPARACION" | "LISTO_DESPACHO" | "EN_CAMINO" | "ENTREGADO") => {
     setSelectedSaleId(saleId);
     setModalType(type);
-    setChofer("");
-    setEncargado("");
+    setChofer(0);
+    setEncargado(0);
     setObservaciones("");
     setIsModalOpen(true);
   };
@@ -68,17 +69,23 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
     if (!selectedSaleId) return;
 
     setLoading(true);
-    let finalObservacion = observaciones.trim();
+    const finalObservacion = observaciones.trim();
 
     // Si pasamos a encargado, guardamos el encargado en la nota
     if (modalType === "EN_PREPARACION") {
-      finalObservacion = `[Preparado por: ${encargado.trim()}] ${finalObservacion}`;
+      const assigned = await asignarEntrega({ saleId: selectedSaleId, managerId: encargado });
+      if (assigned.error) { setLoading(false); alert(assigned.error); return; }
+    }
+    if (modalType === "EN_CAMINO") {
+      const current = sales.find((sale) => sale.id === selectedSaleId);
+      const assigned = await asignarEntrega({ saleId: selectedSaleId, managerId: current?.entrega?.encargadoId, driverId: chofer });
+      if (assigned.error) { setLoading(false); alert(assigned.error); return; }
     }
 
     const res = await actualizarEstadoEnvio(
       selectedSaleId, 
       modalType, 
-      modalType === "EN_CAMINO" ? chofer.trim() : undefined,
+      undefined,
       finalObservacion ? finalObservacion : undefined
     );
     
@@ -270,10 +277,10 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
                   {sale.cliente.direccion && <div className="text-slate-500 text-xs italic mt-1">Dirección: {sale.cliente.direccion}</div>}
                   
                   {/* Chofer asignado */}
-                  {sale.chofer && (
+                  {sale.entrega?.chofer && (
                     <div className="mt-3 p-2 bg-slate-50 border rounded text-xs text-slate-700 flex items-center gap-1">
                       <Truck size={12} className="text-slate-400" />
-                      <span><strong>Chofer:</strong> {sale.chofer}</span>
+                      <span><strong>Chofer:</strong> {sale.entrega.chofer.nombre}</span>
                     </div>
                   )}
 
@@ -333,28 +340,14 @@ export function LogisticaClient({ sales, sucursales }: LogisticaClientProps) {
               {modalType === "EN_PREPARACION" && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Encargado de Preparación *</label>
-                  <input
-                    required
-                    type="text"
-                    value={encargado}
-                    onChange={(e) => setEncargado(e.target.value)}
-                    placeholder="Ej. Carlos González"
-                    className="w-full border rounded p-2 text-sm bg-white outline-none focus:border-slate-400"
-                  />
+                  <select required value={encargado} onChange={(e) => setEncargado(Number(e.target.value))} className="w-full border rounded p-2 text-sm bg-white"><option value={0}>Seleccione un empleado</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.nombre}</option>)}</select>
                 </div>
               )}
 
               {modalType === "EN_CAMINO" && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Nombre del Chofer / Repartidor *</label>
-                  <input
-                    required
-                    type="text"
-                    value={chofer}
-                    onChange={(e) => setChofer(e.target.value)}
-                    placeholder="Ej. Raúl Benítez"
-                    className="w-full border rounded p-2 text-sm bg-white outline-none focus:border-slate-400"
-                  />
+                  <select required value={chofer} onChange={(e) => setChofer(Number(e.target.value))} className="w-full border rounded p-2 text-sm bg-white"><option value={0}>Seleccione un chofer</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.nombre}</option>)}</select>
                 </div>
               )}
 
