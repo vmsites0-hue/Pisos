@@ -1,16 +1,21 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { getAuthenticatedUser } from "@/modules/auth/services/session.service";
+import { PwaRegistration } from "@/components/pwa/PwaRegistration";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "ERPiso - Gestión de Materiales",
   description: "Sistema ERP para venta de pisos y materiales de construcción",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icons/icon-192.svg", apple: "/icons/icon-192.svg" },
 };
+
+export const viewport: Viewport = { themeColor: "#0f172a" };
 
 export default async function RootLayout({
   children,
@@ -22,6 +27,7 @@ export default async function RootLayout({
   return (
     <html lang="es">
       <body className={inter.className}>
+        <PwaRegistration />
         {user ? (
           <div className="flex min-h-screen">
             <Sidebar />
