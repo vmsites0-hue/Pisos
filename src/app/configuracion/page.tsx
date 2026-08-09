@@ -7,14 +7,17 @@ import { SystemParameters } from "@/modules/settings/components/SystemParameters
 import { getSystemParameters } from "@/modules/settings/services/system-parameters.service";
 import { ClassificationSettings } from "@/modules/inventory/components/ClassificationSettings";
 import { getClassifications } from "@/modules/inventory/services/classifications.service";
+import { FamilyAttributesSettings } from "@/modules/inventory/components/FamilyAttributesSettings";
+import { getFamilyAttributes } from "@/modules/inventory/services/family-attributes.service";
 
 export default async function ConfiguracionPage() {
   await requireAuthenticatedUser();
-  const [{ branches, discountRules, categories }, rbac, parameters, classifications] = await Promise.all([
+  const [{ branches, discountRules, categories }, rbac, parameters, classifications, attributes] = await Promise.all([
     getSettingsPageData(),
     getRbacSettingsData(),
     getSystemParameters(),
     getClassifications(),
+    getFamilyAttributes(),
   ]);
 
   return (
@@ -22,6 +25,7 @@ export default async function ConfiguracionPage() {
       <RbacSettings {...rbac} />
       <SystemParameters parameters={parameters} />
       <ClassificationSettings {...classifications} />
+      <FamilyAttributesSettings attributes={attributes} families={classifications.families} />
       <ConfiguracionClient
         sucursales={branches}
         reglas={discountRules}

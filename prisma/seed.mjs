@@ -102,6 +102,24 @@ async function main() {
     });
   }
 
+  const floorFamily = await prisma.familia.findUniqueOrThrow({ where: { nombre: "Pisos" } });
+  const floorAttributes = [
+    ["ANCHO", "Ancho", "NUMERO", true, true, true, null],
+    ["LARGO", "Largo", "NUMERO", true, true, true, null],
+    ["ESPESOR", "Espesor", "NUMERO", false, true, true, null],
+    ["TONO", "Tono", "TEXTO", false, true, true, null],
+    ["CALIBRE", "Calibre", "TEXTO", false, true, true, null],
+    ["COLOR", "Color", "TEXTO", false, true, true, null],
+    ["ACABADO", "Acabado", "SELECCION", false, true, true, JSON.stringify(["Mate", "Brillante", "Satinado"])],
+  ];
+  for (const [key, name, type, required, filterable, identity, options] of floorAttributes) {
+    await prisma.atributoFamilia.upsert({
+      where: { familiaId_clave: { familiaId: floorFamily.id, clave: key } },
+      update: { nombre: name, tipo: type, obligatorio: required, filtrable: filterable, identidad: identity, opciones: options },
+      create: { familiaId: floorFamily.id, clave: key, nombre: name, tipo: type, obligatorio: required, filtrable: filterable, identidad: identity, opciones: options },
+    });
+  }
+
   for (const [code, description] of permissions) {
     await prisma.permiso.upsert({
       where: { codigo: code },
