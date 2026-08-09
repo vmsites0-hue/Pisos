@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/modules/auth/services/access.service";
 import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { readVariantValues, validateVariantValues } from "@/modules/inventory/domain/product-variant";
+import { parseProductImageUrls } from "@/modules/inventory/domain/product-image";
 
 async function resolveClassifications(categoriaId: number, marca: string | null) {
   const category = await prisma.categoria.findUniqueOrThrow({ where: { id: categoriaId } });
@@ -39,7 +40,8 @@ export async function createProducto(formData: FormData) {
     const precioVenta = parseFloat(formData.get("precioVenta") as string);
     const stockMinimoRaw = formData.get("stockMinimo") as string;
     const stockMinimo = stockMinimoRaw ? parseFloat(stockMinimoRaw) : 0;
-    const imagenUrl = (formData.get("imagenUrl") as string)?.trim() || null;
+    const images = parseProductImageUrls(formData.get("imagenes") as string);
+    const imagenUrl = images[0]?.url ?? null;
 
     if (!codigo || !nombre || isNaN(categoriaId) || isNaN(precioCompra) || isNaN(precioVenta)) {
       return { error: "Faltan campos obligatorios o los datos son inválidos." };
@@ -81,6 +83,7 @@ export async function createProducto(formData: FormData) {
         precioVenta,
         stockMinimo,
         imagenUrl,
+        imagenes: { create: images },
         variantes: { create: { sku: codigo, codigoBarras, precioCompra, precioVenta, valores: { create: variantValues } } },
       },
     });
@@ -110,7 +113,8 @@ export async function updateProducto(id: number, formData: FormData) {
     const precioVenta = parseFloat(formData.get("precioVenta") as string);
     const stockMinimoRaw = formData.get("stockMinimo") as string;
     const stockMinimo = stockMinimoRaw ? parseFloat(stockMinimoRaw) : 0;
-    const imagenUrl = (formData.get("imagenUrl") as string)?.trim() || null;
+    const images = parseProductImageUrls(formData.get("imagenes") as string);
+    const imagenUrl = images[0]?.url ?? null;
 
     if (!codigo || !nombre || isNaN(categoriaId) || isNaN(precioCompra) || isNaN(precioVenta)) {
       return { error: "Faltan campos obligatorios o los datos son inválidos." };
@@ -153,6 +157,7 @@ export async function updateProducto(id: number, formData: FormData) {
         precioVenta,
         stockMinimo,
         imagenUrl,
+        imagenes: { deleteMany: {}, create: images },
       } });
       if (primaryVariant) {
         await tx.varianteProducto.update({

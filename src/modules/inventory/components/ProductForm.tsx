@@ -203,12 +203,12 @@ export function ProductForm({ isOpen, onClose, product, categories }: ProductFor
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">URL de Imagen (Opcional)</label>
-              <input
-                name="imagenUrl"
-                type="text"
-                defaultValue={product?.imagenUrl || ""}
-                placeholder="Ej. https://url-de-imagen.jpg"
+              <label className="block text-sm font-medium text-slate-700 mb-1">Imágenes (una URL por línea)</label>
+              <textarea
+                name="imagenes"
+                rows={3}
+                defaultValue={(product?.imagenes?.map((image: any) => image.url) ?? (product?.imagenUrl ? [product.imagenUrl] : [])).join("\n")}
+                placeholder={"https://.../principal.jpg\nhttps://.../detalle.jpg"}
                 className="w-full border rounded-md p-2 text-sm outline-none focus:border-slate-400"
               />
             </div>
