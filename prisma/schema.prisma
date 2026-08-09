@@ -498,6 +498,9 @@ model DetalleVenta {
   conversionSnapshot String @default("{}")
   precioUnitario Float
   precioOriginal Float?
+  productoSnapshot String @default("{}")
+  impuesto       Float     @default(0)
+  moneda         String    @default("PYG")
   subtotal       Float
   
   venta          Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
