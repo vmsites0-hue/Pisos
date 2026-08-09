@@ -1,0 +1,2 @@
+CREATE TABLE "PagoCuota" ("id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "cuotaId" INTEGER NOT NULL, "usuarioId" INTEGER NOT NULL, "monto" REAL NOT NULL, "metodoPago" TEXT NOT NULL, "fecha" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "PagoCuota_cuotaId_fkey" FOREIGN KEY ("cuotaId") REFERENCES "CuotaCredito"("id") ON DELETE RESTRICT ON UPDATE CASCADE, CONSTRAINT "PagoCuota_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE);
+CREATE INDEX "PagoCuota_cuotaId_fecha_idx" ON "PagoCuota"("cuotaId", "fecha");

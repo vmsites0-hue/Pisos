@@ -33,6 +33,7 @@ model Usuario {
   reservasCreadas        ReservaStock[]
   cancelacionesVenta     CancelacionVenta[]
   devoluciones           Devolucion[]
+  pagosCuota             PagoCuota[]
 }
 
 model Rol {
@@ -492,6 +493,7 @@ model Venta {
   entrega        Entrega?
   cancelacion    CancelacionVenta?
   devoluciones   Devolucion[]
+  credito        CreditoVenta?
 }
 
 model CancelacionVenta {
@@ -701,4 +703,71 @@ model ReglaDescuento {
   ventas              Venta[]
 
   @@index([sucursalId])
+}
+
+model PlanCredito {
+  id                    Int      @id @default(autoincrement())
+  nombre                String
+  sistema               String
+  tasaAnual             Float
+  numeroCuotas          Int
+  periodicidadMeses     Int      @default(1)
+  diasPrimeraCuota      Int      @default(30)
+  politicaAjuste        String   @default("CUOTA_FIJA")
+  politicaMora          String   @default("SIN_MORA")
+  politicaPagoAnticipado String  @default("REDUCIR_PLAZO")
+  tasaVariable          Boolean  @default(false)
+  politicaRecalculo     String   @default("AUTORIZADO")
+  moneda                String   @default("PYG")
+  precisionMonetaria    Int      @default(0)
+  activo                Boolean  @default(true)
+  creadoEn              DateTime @default(now())
+  creditos              CreditoVenta[]
+}
+
+model CreditoVenta {
+  id             Int      @id @default(autoincrement())
+  ventaId        Int      @unique
+  planCreditoId  Int
+  principal      Float
+  interesTotal   Float
+  totalFinanciado Float
+  saldoPendiente Float
+  estado         String   @default("ACTIVO")
+  planSnapshot   String
+  creadoEn       DateTime @default(now())
+  venta          Venta    @relation(fields: [ventaId], references: [id])
+  planCredito    PlanCredito @relation(fields: [planCreditoId], references: [id])
+  cuotas         CuotaCredito[]
+}
+
+model CuotaCredito {
+  id             Int      @id @default(autoincrement())
+  creditoVentaId Int
+  numero         Int
+  venceEn        DateTime
+  capital        Float
+  interes        Float
+  monto          Float
+  saldo          Float
+  pagado         Float    @default(0)
+  estado         String   @default("PENDIENTE")
+  creditoVenta   CreditoVenta @relation(fields: [creditoVentaId], references: [id], onDelete: Cascade)
+  pagos          PagoCuota[]
+
+  @@unique([creditoVentaId, numero])
+  @@index([estado, venceEn])
+}
+
+model PagoCuota {
+  id          Int      @id @default(autoincrement())
+  cuotaId     Int
+  usuarioId   Int
+  monto       Float
+  metodoPago  String
+  fecha       DateTime @default(now())
+  cuota       CuotaCredito @relation(fields: [cuotaId], references: [id])
+  usuario     Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([cuotaId, fecha])
 }

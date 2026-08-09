@@ -16,6 +16,7 @@ import { requestApproval } from "@/modules/approvals/services/approvals.service"
 import { validateSaleContract } from "@/modules/sales/domain/sale-validation";
 import { calcularDescuentoAutomatico } from "@/modules/discounts/services/discounts.service";
 import { buildDeliverySnapshot } from "@/modules/sales/domain/delivery";
+import { buildAmortizationSchedule } from "@/modules/credit/domain/amortization";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -41,6 +42,7 @@ export interface VentaInput {
   descuentoAutomatico?: number;
   approvalId?: number | null;
   exceptionReason?: string;
+  creditPlanId?: number | null;
 }
 
 export async function procesarVenta(input: VentaInput) {
@@ -205,6 +207,11 @@ export async function procesarVenta(input: VentaInput) {
       // El estado inicial si es Retiro en Local es ENTREGADO directamente. Si es ENVIO, es PENDIENTE.
       const estadoInicial = tipoEntrega === "RETIRO" ? "ENTREGADO" : "PENDIENTE";
       const delivery = buildDeliverySnapshot({ deliveryType: tipoEntrega, customer: cliente });
+      const creditPlan = metodoPago === "CREDITO" && input.creditPlanId ? await tx.planCredito.findFirst({ where: { id: input.creditPlanId, activo: true } }) : null;
+      if (metodoPago === "CREDITO" && !creditPlan) throw new Error("Seleccione un plan de crédito activo.");
+      const firstDueDate = creditPlan ? new Date(Date.now() + creditPlan.diasPrimeraCuota * 86400000) : null;
+      const creditSchedule = creditPlan && firstDueDate ? buildAmortizationSchedule({ principal: total, annualRate: creditPlan.tasaAnual, installments: creditPlan.numeroCuotas, system: creditPlan.sistema as "FRANCES" | "ALEMAN", periodicityMonths: creditPlan.periodicidadMeses, firstDueDate, precision: creditPlan.precisionMonetaria }) : null;
+      if (creditSchedule && cliente.saldoDeudor + creditSchedule.total > cliente.limiteCredito) throw new Error("El total financiado con intereses supera el límite de crédito.");
 
       // 4. Crear la Venta y sus Detalles
       const venta = await tx.venta.create({
@@ -227,6 +234,7 @@ export async function procesarVenta(input: VentaInput) {
             create: detallesToCreate,
           },
           ...(delivery ? { entrega: { create: delivery } } : {}),
+          ...(creditPlan && creditSchedule ? { credito: { create: { planCreditoId: creditPlan.id, principal: total, interesTotal: creditSchedule.totalInterest, totalFinanciado: creditSchedule.total, saldoPendiente: creditSchedule.total, planSnapshot: JSON.stringify(creditPlan), cuotas: { create: creditSchedule.installments.map((installment) => ({ numero: installment.number, venceEn: installment.dueDate, capital: installment.capital, interes: installment.interest, monto: installment.payment, saldo: installment.balance })) } } } } : {}),
         },
         include: {
           detalles: {
@@ -237,12 +245,14 @@ export async function procesarVenta(input: VentaInput) {
           cliente: true,
           sucursal: true,
           entrega: true,
+          credito: { include: { cuotas: true } },
         },
       });
       if (reservation) {
         const activeLines = await tx.lineaReservaStock.count({ where: { reservaId: reservation.id, estado: "ACTIVA" } });
         await tx.reservaStock.update({ where: { id: reservation.id }, data: { estado: activeLines === 0 ? "CONSUMIDA" : "PARCIALMENTE_CONSUMIDA" } });
       }
+      if (creditSchedule && creditSchedule.totalInterest > 0) await tx.cliente.update({ where: { id: clienteId }, data: { saldoDeudor: { increment: creditSchedule.totalInterest } } });
       if (quotation) await tx.presupuesto.update({ where: { id: quotation.id }, data: { estado: "CONVERTIDO" } });
       if (approvedRequest) {
         const consumed = await tx.solicitudAprobacion.updateMany({ where: { id: approvedRequest.id, estado: "APROBADA", ejecutadoEn: null }, data: { estado: "EJECUTADA", ejecutadoEn: new Date() } });

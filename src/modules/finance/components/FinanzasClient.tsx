@@ -16,19 +16,22 @@ import {
 } from "lucide-react";
 import { registrarPagoCliente } from "@/modules/finance/actions/payments.actions";
 import { registrarGasto, eliminarGasto } from "@/modules/finance/actions/expenses.actions";
+import { registerInstallmentPayment } from "@/modules/credit/actions/installment-payments.actions";
 
 interface FinanzasClientProps {
   sales: any[];
   debtorClients: any[];
   gastos: any[];
+  credits: any[];
 }
 
-export function FinanzasClient({ sales, debtorClients, gastos }: FinanzasClientProps) {
+export function FinanzasClient({ sales, debtorClients, gastos, credits }: FinanzasClientProps) {
   // Modal de cobro de clientes
   const [isCobroModalOpen, setIsCobroModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [cobroError, setCobroError] = useState<string | null>(null);
   const [cobroLoading, setCobroLoading] = useState(false);
+  const [installmentMessage, setInstallmentMessage] = useState<string | null>(null);
 
   // Modal de registro de gastos
   const [isGastoModalOpen, setIsGastoModalOpen] = useState(false);
@@ -302,6 +305,8 @@ export function FinanzasClient({ sales, debtorClients, gastos }: FinanzasClientP
         </div>
 
       </div>
+
+      <section className="rounded-xl border bg-white p-4"><h3 className="font-bold">Cuotas pendientes</h3>{installmentMessage && <p className="mt-2 text-sm">{installmentMessage}</p>}<div className="mt-3 space-y-2">{credits.flatMap((credit) => credit.cuotas.map((installment: any) => <form key={installment.id} action={async (data) => { const result = await registerInstallmentPayment(data); setInstallmentMessage(result.error ?? "Cobro registrado."); }} className="grid grid-cols-2 gap-2 rounded border p-2 text-xs md:grid-cols-6"><span>{credit.venta.cliente.nombre} {credit.venta.cliente.apellido}</span><span>Cuota #{installment.numero} · {new Date(installment.venceEn).toLocaleDateString("es-PY")}</span><span>{installment.estado} · saldo {formatMoney(installment.monto - installment.pagado)}</span><input type="hidden" name="installmentId" value={installment.id} /><input required name="amount" type="number" min="1" max={installment.monto - installment.pagado} placeholder="Monto" className="rounded border p-1" /><select name="paymentMethod" className="rounded border p-1"><option>EFECTIVO</option><option>TARJETA</option><option>TRANSFERENCIA</option></select><button className="rounded bg-slate-900 p-1 text-white">Registrar cobro</button></form>))}</div></section>
 
       {/* MODAL: REGISTRAR COBRO CLIENTE */}
       {isCobroModalOpen && selectedClient && (
