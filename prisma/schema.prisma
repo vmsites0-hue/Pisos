@@ -32,6 +32,7 @@ model Usuario {
   eventosPresentacion    EventoPresentacionInventario[]
   reservasCreadas        ReservaStock[]
   cancelacionesVenta     CancelacionVenta[]
+  devoluciones           Devolucion[]
 }
 
 model Rol {
@@ -349,6 +350,7 @@ model Inventario {
   alertaMinimoSecuencia Int @default(0)
   presentacionesCerradas Int @default(0)
   remanenteAbierto Float @default(0)
+  stockCuarentena Float @default(0)
   
   actualizado     DateTime  @updatedAt
 
@@ -359,6 +361,7 @@ model Inventario {
   eventosPresentacion EventoPresentacionInventario[]
   lineasReserva LineaReservaStock[]
   detallesVenta DetalleVenta[]
+  detallesDevolucion DetalleDevolucion[]
 
   @@unique([productoId, sucursalId, loteTono])
   @@index([varianteId, sucursalId, lote, tono, calibre])
@@ -488,6 +491,7 @@ model Venta {
   detalles       DetalleVenta[]
   entrega        Entrega?
   cancelacion    CancelacionVenta?
+  devoluciones   Devolucion[]
 }
 
 model CancelacionVenta {
@@ -537,6 +541,37 @@ model DetalleVenta {
   producto       Producto  @relation(fields: [productoId], references: [id])
   variante       VarianteProducto? @relation(fields: [varianteId], references: [id])
   inventario     Inventario? @relation(fields: [inventarioId], references: [id])
+  devoluciones   DetalleDevolucion[]
+}
+
+model Devolucion {
+  id           Int      @id @default(autoincrement())
+  ventaId      Int
+  usuarioId    Int
+  aprobacionId Int?
+  motivo       String
+  evidenciaUrl String?
+  creadaEn     DateTime @default(now())
+  venta        Venta    @relation(fields: [ventaId], references: [id])
+  usuario      Usuario  @relation(fields: [usuarioId], references: [id])
+  detalles     DetalleDevolucion[]
+
+  @@index([ventaId, creadaEn])
+}
+
+model DetalleDevolucion {
+  id             Int @id @default(autoincrement())
+  devolucionId   Int
+  detalleVentaId Int
+  inventarioId   Int
+  cantidad       Float
+  condicion      String
+  importe        Float
+  devolucion     Devolucion @relation(fields: [devolucionId], references: [id], onDelete: Cascade)
+  detalleVenta   DetalleVenta @relation(fields: [detalleVentaId], references: [id])
+  inventario     Inventario @relation(fields: [inventarioId], references: [id])
+
+  @@index([detalleVentaId])
 }
 
 // ==========================================
