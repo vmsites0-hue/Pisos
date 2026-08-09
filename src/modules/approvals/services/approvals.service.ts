@@ -6,6 +6,8 @@ import { requirePermission } from "@/modules/auth/services/access.service";
 import { requireAuthenticatedUser } from "@/modules/auth/services/session.service";
 import { isApprovalType, type ApprovalType } from "@/modules/approvals/domain/approval-types";
 import { recordAudit } from "@/modules/audit/services/audit.service";
+import { notifyUser } from "@/modules/notifications/services/notification-dispatch.service";
+import { notificationKey } from "@/modules/notifications/domain/events";
 
 export async function requestApproval(input: {
   type: string;
@@ -30,6 +32,7 @@ export async function requestApproval(input: {
     },
   });
   await recordAudit({ userId: user.id, action: "SOLICITUD_CREADA", entity: "SolicitudAprobacion", entityId: request.id, after: request });
+  await notifyUser({ userId: user.id, type: "SOLICITUD_APROBACION", title: "Solicitud enviada", message: `La solicitud #${request.id} quedó pendiente de aprobación.`, link: "/aprobaciones", idempotencyKey: notificationKey("SOLICITUD_APROBACION", request.id, user.id) });
   revalidatePath("/aprobaciones");
   return request;
 }
@@ -52,17 +55,20 @@ export async function approveRequest(id: number) {
   });
   if (result.count !== 1) throw new Error("La solicitud fue resuelta por otro usuario.");
   await recordAudit({ userId: approver.id, action: "SOLICITUD_APROBADA", entity: "SolicitudAprobacion", entityId: id, before: request, after: { estado: "APROBADA" } });
+  await notifyUser({ userId: request.solicitanteId, type: "RESULTADO_APROBACION", title: "Solicitud aprobada", message: `La solicitud #${id} fue aprobada.`, link: "/aprobaciones", idempotencyKey: notificationKey("RESULTADO_APROBACION", id, request.solicitanteId, 1) });
   revalidatePath("/aprobaciones");
 }
 
 export async function rejectRequest(id: number) {
   const approver = await requirePermission(PERMISSIONS.APPROVALS_REVIEW);
+  const request = await prisma.solicitudAprobacion.findUniqueOrThrow({ where: { id } });
   const result = await prisma.solicitudAprobacion.updateMany({
     where: { id, estado: "PENDIENTE" },
     data: { estado: "RECHAZADA", aprobadorId: approver.id, resueltoEn: new Date() },
   });
   if (result.count !== 1) throw new Error("La solicitud ya fue resuelta.");
   await recordAudit({ userId: approver.id, action: "SOLICITUD_RECHAZADA", entity: "SolicitudAprobacion", entityId: id, after: { estado: "RECHAZADA" } });
+  await notifyUser({ userId: request.solicitanteId, type: "RESULTADO_APROBACION", title: "Solicitud rechazada", message: `La solicitud #${id} fue rechazada.`, link: "/aprobaciones", idempotencyKey: notificationKey("RESULTADO_APROBACION", id, request.solicitanteId, 2) });
   revalidatePath("/aprobaciones");
 }
 

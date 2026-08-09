@@ -9,6 +9,8 @@ import { canEditQuotation, resolveQuotationExpiration, validateQuotationTotals }
 import { recordAudit } from "@/modules/audit/services/audit.service";
 import { normalizeRecalculationPolicy, quotationValuesChanged } from "@/modules/quotations/domain/recalculation";
 import { compareCommercialValues } from "@/modules/quotations/domain/variation";
+import { notifyUser } from "@/modules/notifications/services/notification-dispatch.service";
+import { notificationKey } from "@/modules/notifications/domain/events";
 import { calcularDescuentoAutomatico } from "@/modules/discounts/services/discounts.service";
 import { resolvePresentationPrice } from "@/modules/pricing/domain/presentation-price";
 
@@ -143,7 +145,7 @@ export async function recalcularPresupuesto(id: number) {
 }
 
 export async function compararVariacionesPresupuesto(id: number) {
-  await requirePermission(PERMISSIONS.QUOTATIONS_MANAGE);
+  const actor = await requirePermission(PERMISSIONS.QUOTATIONS_MANAGE);
   try {
     const quotation = await prisma.presupuesto.findUniqueOrThrow({ where: { id }, include: { detalles: { include: { producto: { include: { categoria: true, variantes: { where: { activa: true }, include: { unidadBase: true, presentaciones: { where: { activa: true }, include: { unidad: true } } } } } }, variante: true } } } });
     const lines = [];
@@ -162,6 +164,7 @@ export async function compararVariacionesPresupuesto(id: number) {
     const discountVariations = quotation.descuento === automaticDiscount.monto ? [] : [{ field: "DESCUENTO" as const, previous: quotation.descuento, current: automaticDiscount.monto, difference: automaticDiscount.monto - quotation.descuento }];
     const totalCurrent = currentSubtotal - automaticDiscount.monto;
     const hasVariations = lines.some((line) => line.variations.length > 0) || discountVariations.length > 0;
+    if (hasVariations) await notifyUser({ userId: actor.id, type: "VARIACION_PRESUPUESTO", title: "Variación de presupuesto", message: `El presupuesto #${id} cambió respecto de sus valores guardados.`, link: "/presupuestos", idempotencyKey: notificationKey("VARIACION_PRESUPUESTO", `${id}:${totalCurrent}`, actor.id) });
     return { success: true, hasVariations, lines: lines.filter((line) => line.variations.length), discountVariations, previousTotal: quotation.total, currentTotal: totalCurrent, totalDifference: totalCurrent - quotation.total };
   } catch (error: unknown) { return { error: error instanceof Error ? error.message : "No se pudieron comparar las variaciones." }; }
 }
