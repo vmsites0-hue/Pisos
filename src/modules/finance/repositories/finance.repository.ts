@@ -7,7 +7,7 @@ export async function getFinancePageData(filters?: { from?: string; to?: string;
   const dateFilter = { gte: todayStart, ...(periodEnd ? { lte: periodEnd } : {}) };
   const movementFilter = { creadoEn: dateFilter, ...(filters?.userId ? { usuarioId: filters.userId } : {}), ...(filters?.paymentMethod ? { metodoPago: filters.paymentMethod } : {}) };
 
-  const [sales, debtorCustomers, expenses, credits, movements] = await Promise.all([
+  const [sales, debtorCustomers, expenses, credits, movements, closures] = await Promise.all([
     prisma.venta.findMany({
       where: { fecha: dateFilter, sucursal: { esPrincipal: true }, ...(filters?.userId ? { usuarioId: filters.userId } : {}), ...(filters?.paymentMethod ? { metodoPago: filters.paymentMethod } : {}) },
       orderBy: { fecha: "desc" },
@@ -22,7 +22,8 @@ export async function getFinancePageData(filters?: { from?: string; to?: string;
     }),
     prisma.creditoVenta.findMany({ where: { estado: "ACTIVO" }, include: { venta: { include: { cliente: true } }, cuotas: { where: { estado: { not: "PAGADA" } }, orderBy: { numero: "asc" } } }, orderBy: { creadoEn: "desc" } }),
     prisma.movimientoFinanciero.findMany({ where: movementFilter, include: { usuario: { select: { nombre: true } } }, orderBy: { creadoEn: "desc" } }),
+    prisma.cierreCaja.findMany({ include: { responsable: { select: { nombre: true } } }, orderBy: { cerradoEn: "desc" }, take: 20 }),
   ]);
   const users = await prisma.usuario.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } });
-  return { sales, debtorCustomers, expenses, credits, movements, users };
+  return { sales, debtorCustomers, expenses, credits, movements, closures, users };
 }

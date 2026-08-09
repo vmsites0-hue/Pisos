@@ -5,6 +5,7 @@ export const APPROVAL_TYPES = {
   SALE_CANCELLATION: "CANCELACION_VENTA",
   RETURN: "DEVOLUCION",
   EXPENSE_DELETION: "ELIMINACION_GASTO",
+  CASH_CLOSURE_REOPENING: "REAPERTURA_CIERRE_CAJA",
 } as const;
 
 export type ApprovalType = (typeof APPROVAL_TYPES)[keyof typeof APPROVAL_TYPES];
@@ -16,6 +17,7 @@ export const APPROVAL_TYPE_LABELS: Record<ApprovalType, string> = {
   CANCELACION_VENTA: "Cancelación de venta",
   DEVOLUCION: "Devolución",
   ELIMINACION_GASTO: "Eliminación de gasto",
+  REAPERTURA_CIERRE_CAJA: "Reapertura de cierre de caja",
 };
 
 export function isApprovalType(value: string): value is ApprovalType {

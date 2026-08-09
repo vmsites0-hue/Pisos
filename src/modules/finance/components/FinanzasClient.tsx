@@ -18,6 +18,7 @@ import { registrarPagoCliente } from "@/modules/finance/actions/payments.actions
 import { registrarGasto, eliminarGasto } from "@/modules/finance/actions/expenses.actions";
 import { registerInstallmentPayment } from "@/modules/credit/actions/installment-payments.actions";
 import { summarizeFinances } from "@/modules/finance/domain/financial-summary";
+import { closeCash, reopenClosure } from "@/modules/finance/actions/cash-closures.actions";
 
 interface FinanzasClientProps {
   sales: any[];
@@ -27,9 +28,10 @@ interface FinanzasClientProps {
   movements: any[];
   users: Array<{ id: number; nombre: string }>;
   filters: { from?: string; to?: string; userId?: number; paymentMethod?: string };
+  closures: any[];
 }
 
-export function FinanzasClient({ sales, debtorClients, gastos, credits, movements, users, filters }: FinanzasClientProps) {
+export function FinanzasClient({ sales, debtorClients, gastos, credits, movements, users, filters, closures }: FinanzasClientProps) {
   // Modal de cobro de clientes
   const [isCobroModalOpen, setIsCobroModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
@@ -156,6 +158,17 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
           {[["Ventas brutas", summary.grossSales], ["Descuentos", summary.discounts], ["Devoluciones", summary.returns], ["Ventas netas", summary.netSales], ["Cobros", summary.collections], ["Cuentas por cobrar", summary.accountsReceivable], ["Gastos", summary.expenses], ["Saldo de caja", summary.cashBalance]].map(([label, value]) => <div key={String(label)} className="rounded border p-3"><span className="block text-slate-500">{label}</span><strong>{formatMoney(Number(value))}</strong></div>)}
         </div>
         <p className="mt-2 text-[10px] text-slate-500">El local principal se aplica internamente; no existe filtro multisucursal.</p>
+      </section>
+
+      <section className="rounded-xl border bg-white p-4">
+        <h3 className="font-bold">Cierre de caja</h3>
+        <form action={async (data) => { const result = await closeCash(data); alert(result.error ?? "Caja cerrada."); }} className="mt-3 grid gap-2 md:grid-cols-4">
+          <input required type="datetime-local" name="from" className="rounded border p-2 text-xs" aria-label="Inicio del cierre" />
+          <input required type="datetime-local" name="to" className="rounded border p-2 text-xs" aria-label="Fin del cierre" />
+          <input required type="number" min="0" name="declared" placeholder="Importe contado" className="rounded border p-2 text-xs" />
+          <button className="rounded bg-slate-900 p-2 text-xs font-semibold text-white">Confirmar cierre</button>
+        </form>
+        <div className="mt-3 space-y-2">{closures.map((closure) => <div key={closure.id} className="grid items-center gap-2 rounded border p-2 text-xs md:grid-cols-6"><span>#{closure.id} · {closure.estado}</span><span>{closure.responsable.nombre}</span><span>Esperado {formatMoney(closure.importeEsperado)}</span><span>Declarado {formatMoney(closure.importeDeclarado)}</span><span>Diferencia {formatMoney(closure.diferencia)}</span>{closure.estado === "CERRADO" && <button type="button" className="rounded border p-1" onClick={async () => { const reason = prompt("Motivo de reapertura:"); if (!reason) return; const approvalText = prompt("ID aprobado (vacío para solicitar):"); const result = await reopenClosure(closure.id, reason, approvalText ? Number(approvalText) : undefined); alert(result.error ?? (result.approvalRequired ? `Solicitud #${result.approvalRequestId} creada.` : "Cierre reabierto.")); }}>Solicitar reapertura</button>}</div>)}</div>
       </section>
 
       {/* Widgets de Flujo de Caja */}

@@ -40,6 +40,7 @@ model Usuario {
   entregasComoChofer      Entrega[]                      @relation("EntregaChofer")
   entregasConfirmadas     Entrega[]                      @relation("EntregaConfirmadaPor")
   gastos                  Gasto[]
+  cierresCaja             CierreCaja[]
 }
 
 model Rol {
@@ -714,6 +715,24 @@ model Gasto {
 
   @@index([sucursalId])
   @@index([usuarioId, fecha])
+}
+
+model CierreCaja {
+  id                     Int       @id @default(autoincrement())
+  periodoDesde           DateTime
+  periodoHasta           DateTime
+  responsableId          Int
+  importeEsperado        Float
+  importeDeclarado       Float
+  diferencia             Float
+  estado                 String    @default("CERRADO")
+  cerradoEn              DateTime  @default(now())
+  reabiertoEn            DateTime?
+  aprobacionReaperturaId Int?
+  responsable            Usuario   @relation(fields: [responsableId], references: [id])
+
+  @@index([periodoDesde, periodoHasta])
+  @@index([responsableId, cerradoEn])
 }
 
 // ==========================================
