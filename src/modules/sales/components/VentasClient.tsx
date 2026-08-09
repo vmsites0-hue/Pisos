@@ -807,6 +807,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
                       <div className="text-slate-400 text-[10px]">
                         {det.cantidad} {det.producto.unidadVenta} x {formatMoney(det.precioUnitario)}
                       </div>
+                      {det.cantidadSolicitada != null && <div className="text-slate-500 text-[10px]">Solicitado: {det.cantidadSolicitada} · Presentaciones: {det.cantidadPresentacion} · Real: {det.cantidad}</div>}
                     </div>
                     <span className="text-right font-semibold">{formatMoney(det.subtotal)}</span>
                   </div>

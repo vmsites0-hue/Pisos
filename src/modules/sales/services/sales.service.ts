@@ -5,6 +5,7 @@ import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 import { recordAudit } from "@/modules/audit/services/audit.service";
 import { getMainBranch } from "@/modules/branches/services/main-branch.service";
 import { getSystemParameterSnapshot } from "@/modules/settings/services/system-parameters.service";
+import { calculateProductQuantity } from "@/modules/inventory/domain/quantity-conversion";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -54,6 +55,7 @@ export async function procesarVenta(input: VentaInput) {
       for (const item of detalles) {
         const producto = await tx.producto.findUnique({
           where: { id: item.productoId },
+          include: { variantes: { where: { activa: true }, orderBy: { id: "asc" }, take: 1, include: { unidadBase: true, presentaciones: { where: { activa: true }, include: { unidad: true } } } } },
         });
         if (!producto) {
           throw new Error(`El producto con ID ${item.productoId} no existe.`);
@@ -68,11 +70,12 @@ export async function procesarVenta(input: VentaInput) {
           },
         });
 
+        const conversion = calculateProductQuantity(producto, item.cantidad);
         const stockActual = inv ? inv.stockActual : 0;
-        if (stockActual < item.cantidad) {
+        if (stockActual < conversion.actualQuantity) {
           throw new Error(
             `Stock insuficiente para el producto "${producto.nombre}" [Lote: ${item.loteTono || "Sin especificar"}]. ` +
-            `Disponible: ${stockActual} ${producto.unidadVenta}, Requerido: ${item.cantidad} ${producto.unidadVenta}`
+            `Disponible: ${stockActual} ${producto.unidadVenta}, Requerido real: ${conversion.actualQuantity} ${producto.unidadVenta}`
           );
         }
 
@@ -81,17 +84,20 @@ export async function procesarVenta(input: VentaInput) {
           where: { id: inv!.id },
           data: {
             stockActual: {
-              decrement: item.cantidad,
+              decrement: conversion.actualQuantity,
             },
           },
         });
 
-        const itemSubtotal = item.cantidad * item.precioUnitario;
+        const itemSubtotal = conversion.actualQuantity * item.precioUnitario;
         subtotal += itemSubtotal;
 
         detallesToCreate.push({
           productoId: item.productoId,
-          cantidad: item.cantidad,
+          cantidad: conversion.actualQuantity,
+          cantidadSolicitada: conversion.requestedQuantity,
+          cantidadPresentacion: conversion.presentationQuantity,
+          conversionSnapshot: JSON.stringify(conversion),
           precioUnitario: item.precioUnitario,
           subtotal: itemSubtotal,
         });
