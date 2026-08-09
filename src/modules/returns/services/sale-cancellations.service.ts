@@ -8,6 +8,7 @@ import { validateSaleCancellation } from "@/modules/returns/domain/sale-cancella
 import { recordInventoryMovement } from "@/modules/inventory/services/inventory-movements.service";
 import { syncMinimumStockAlert } from "@/modules/inventory/services/minimum-stock.service";
 import { recordAudit } from "@/modules/audit/services/audit.service";
+import { recordFinancialMovement } from "@/modules/finance/services/financial-movements.service";
 
 export async function cancelSale(input: { saleId: number; reason: string; approvalId?: number | null }) {
   const actor = await requirePermission(PERMISSIONS.SALES_CREATE);
@@ -37,6 +38,7 @@ export async function cancelSale(input: { saleId: number; reason: string; approv
       if (current.metodoPago === "CREDITO") await tx.cliente.update({ where: { id: current.clienteId }, data: { saldoDeudor: Math.max(0, current.cliente.saldoDeudor - current.total) } });
       await tx.venta.update({ where: { id: current.id }, data: { estado: "CANCELADA", ...(current.entrega ? { entrega: { update: { estado: "CANCELADA" } } } : {}) } });
       await tx.cancelacionVenta.create({ data: { ventaId: current.id, motivo: input.reason.trim(), usuarioId: actor.id, aprobacionId: approval.id } });
+      await recordFinancialMovement(tx, { type: "EGRESO", category: "CANCELACION_VENTA", amount: current.total, affectsResult: true, affectsCash: current.metodoPago !== "CREDITO", paymentMethod: current.metodoPago, userId: actor.id, referenceType: "VENTA", referenceId: current.id, description: input.reason });
       const consumed = await tx.solicitudAprobacion.updateMany({ where: { id: approval.id, estado: "APROBADA", ejecutadoEn: null }, data: { estado: "EJECUTADA", ejecutadoEn: new Date() } });
       if (consumed.count !== 1) throw new Error("La aprobación ya fue utilizada.");
       await recordAudit({ userId: actor.id, action: "VENTA_CANCELADA", entity: "Venta", entityId: current.id, before: { estado: current.estado }, after: { estado: "CANCELADA", motivo: input.reason, aprobacionId: approval.id } }, tx);

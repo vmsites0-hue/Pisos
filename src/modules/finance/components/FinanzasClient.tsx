@@ -17,15 +17,21 @@ import {
 import { registrarPagoCliente } from "@/modules/finance/actions/payments.actions";
 import { registrarGasto, eliminarGasto } from "@/modules/finance/actions/expenses.actions";
 import { registerInstallmentPayment } from "@/modules/credit/actions/installment-payments.actions";
+import { summarizeFinances } from "@/modules/finance/domain/financial-summary";
+import { closeCash, reopenClosure } from "@/modules/finance/actions/cash-closures.actions";
 
 interface FinanzasClientProps {
   sales: any[];
   debtorClients: any[];
   gastos: any[];
   credits: any[];
+  movements: any[];
+  users: Array<{ id: number; nombre: string }>;
+  filters: { from?: string; to?: string; userId?: number; paymentMethod?: string };
+  closures: any[];
 }
 
-export function FinanzasClient({ sales, debtorClients, gastos, credits }: FinanzasClientProps) {
+export function FinanzasClient({ sales, debtorClients, gastos, credits, movements, users, filters, closures }: FinanzasClientProps) {
   // Modal de cobro de clientes
   const [isCobroModalOpen, setIsCobroModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
@@ -48,10 +54,11 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits }: Finanz
   const totalCuentasPorCobrar = debtorClients.reduce((acc, curr) => acc + curr.saldoDeudor, 0);
 
   // Total de gastos registrados
-  const totalGastos = gastos.reduce((acc, curr) => acc + curr.monto, 0);
+  const totalGastos = gastos.filter((expense) => expense.estado !== "ANULADO").reduce((acc, curr) => acc + curr.monto, 0);
 
   // Saldo Neto Diario / Balance General
   const saldoNeto = totalRevenue - totalGastos;
+  const summary = summarizeFinances(sales, movements, totalCuentasPorCobrar);
 
   // Formateador de moneda (Gs.)
   const formatMoney = (val: number) => {
@@ -103,12 +110,16 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits }: Finanz
     }
   }
 
-  // Eliminar un gasto
+  // Anular un gasto conservando su trazabilidad
   async function handleDeleteGasto(id: number, desc: string) {
-    if (!confirm(`¿Estás seguro de eliminar el gasto "${desc}"?`)) return;
-    const res = await eliminarGasto(id);
+    const motivo = prompt(`Motivo para anular el gasto "${desc}":`);
+    if (!motivo) return;
+    const approvalText = prompt("ID de aprobación autorizada (vacío para crear la solicitud):");
+    const res = await eliminarGasto(id, motivo, approvalText ? Number(approvalText) : undefined);
     if (res.error) {
       alert(res.error);
+    } else if (res.approvalRequired) {
+      alert(`Solicitud #${res.approvalRequestId} creada. Tras aprobarla, repetí la anulación indicando ese ID.`);
     }
   }
 
@@ -134,6 +145,31 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits }: Finanz
           <span>Registrar Gasto</span>
         </button>
       </div>
+
+      <section className="rounded-xl border bg-white p-4">
+        <form className="grid gap-2 md:grid-cols-5">
+          <input type="date" name="from" defaultValue={filters.from} className="rounded border p-2 text-xs" aria-label="Desde" />
+          <input type="date" name="to" defaultValue={filters.to} className="rounded border p-2 text-xs" aria-label="Hasta" />
+          <select name="userId" defaultValue={filters.userId ?? ""} className="rounded border p-2 text-xs"><option value="">Todos los usuarios</option>{users.map((user) => <option key={user.id} value={user.id}>{user.nombre}</option>)}</select>
+          <select name="paymentMethod" defaultValue={filters.paymentMethod ?? ""} className="rounded border p-2 text-xs"><option value="">Todos los métodos</option><option>EFECTIVO</option><option>TARJETA</option><option>TRANSFERENCIA</option><option>CREDITO</option></select>
+          <button className="rounded bg-slate-900 p-2 text-xs font-semibold text-white">Consultar período</button>
+        </form>
+        <div className="mt-4 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+          {[["Ventas brutas", summary.grossSales], ["Descuentos", summary.discounts], ["Devoluciones", summary.returns], ["Ventas netas", summary.netSales], ["Cobros", summary.collections], ["Cuentas por cobrar", summary.accountsReceivable], ["Gastos", summary.expenses], ["Saldo de caja", summary.cashBalance]].map(([label, value]) => <div key={String(label)} className="rounded border p-3"><span className="block text-slate-500">{label}</span><strong>{formatMoney(Number(value))}</strong></div>)}
+        </div>
+        <p className="mt-2 text-[10px] text-slate-500">El local principal se aplica internamente; no existe filtro multisucursal.</p>
+      </section>
+
+      <section className="rounded-xl border bg-white p-4">
+        <h3 className="font-bold">Cierre de caja</h3>
+        <form action={async (data) => { const result = await closeCash(data); alert(result.error ?? "Caja cerrada."); }} className="mt-3 grid gap-2 md:grid-cols-4">
+          <input required type="datetime-local" name="from" className="rounded border p-2 text-xs" aria-label="Inicio del cierre" />
+          <input required type="datetime-local" name="to" className="rounded border p-2 text-xs" aria-label="Fin del cierre" />
+          <input required type="number" min="0" name="declared" placeholder="Importe contado" className="rounded border p-2 text-xs" />
+          <button className="rounded bg-slate-900 p-2 text-xs font-semibold text-white">Confirmar cierre</button>
+        </form>
+        <div className="mt-3 space-y-2">{closures.map((closure) => <div key={closure.id} className="grid items-center gap-2 rounded border p-2 text-xs md:grid-cols-6"><span>#{closure.id} · {closure.estado}</span><span>{closure.responsable.nombre}</span><span>Esperado {formatMoney(closure.importeEsperado)}</span><span>Declarado {formatMoney(closure.importeDeclarado)}</span><span>Diferencia {formatMoney(closure.diferencia)}</span>{closure.estado === "CERRADO" && <button type="button" className="rounded border p-1" onClick={async () => { const reason = prompt("Motivo de reapertura:"); if (!reason) return; const approvalText = prompt("ID aprobado (vacío para solicitar):"); const result = await reopenClosure(closure.id, reason, approvalText ? Number(approvalText) : undefined); alert(result.error ?? (result.approvalRequired ? `Solicitud #${result.approvalRequestId} creada.` : "Cierre reabierto.")); }}>Solicitar reapertura</button>}</div>)}</div>
+      </section>
 
       {/* Widgets de Flujo de Caja */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -282,18 +318,19 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits }: Finanz
                         <td className="px-3 py-3">
                           <span className="font-semibold text-slate-900 block">{g.descripcion}</span>
                           {g.categoria && <span className="inline-block mt-0.5 text-[9px] uppercase bg-slate-100 px-1 border rounded text-slate-600">{g.categoria}</span>}
+                          <span className={`ml-1 text-[9px] font-bold ${g.estado === "ANULADO" ? "text-red-600" : "text-emerald-600"}`}>{g.estado}</span>
                         </td>
                         <td className="px-3 py-3 text-right font-bold text-red-600">
                           {formatMoney(g.monto)}
                         </td>
                         <td className="px-3 py-3 text-center">
-                          <button
+                          {g.estado !== "ANULADO" && <button
                             onClick={() => handleDeleteGasto(g.id, g.descripcion)}
                             className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors inline-block cursor-pointer"
-                            title="Eliminar Gasto"
+                            title="Solicitar anulación"
                           >
                             <Trash2 size={14} />
-                          </button>
+                          </button>}
                         </td>
                       </tr>
                     ))
@@ -305,6 +342,8 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits }: Finanz
         </div>
 
       </div>
+
+      <section className="rounded-xl border bg-white p-4"><h3 className="font-bold">Movimientos financieros del día</h3><div className="mt-2 overflow-x-auto"><table className="w-full text-xs"><thead><tr><th className="p-2 text-left">Fecha</th><th className="p-2 text-left">Categoría</th><th className="p-2 text-left">Método</th><th className="p-2 text-left">Usuario</th><th className="p-2 text-right">Resultado</th><th className="p-2 text-right">Caja</th></tr></thead><tbody>{movements.map((movement) => <tr key={movement.id} className="border-t"><td className="p-2">{new Date(movement.creadoEn).toLocaleString("es-PY")}</td><td className="p-2">{movement.categoria}</td><td className="p-2">{movement.metodoPago || "-"}</td><td className="p-2">{movement.usuario.nombre}</td><td className="p-2 text-right">{movement.afectaResultado ? `${movement.tipo === "EGRESO" ? "-" : "+"}${formatMoney(movement.importe)}` : "-"}</td><td className="p-2 text-right">{movement.afectaCaja ? `${movement.tipo === "EGRESO" ? "-" : "+"}${formatMoney(movement.importe)}` : "-"}</td></tr>)}</tbody></table></div></section>
 
       <section className="rounded-xl border bg-white p-4"><h3 className="font-bold">Cuotas pendientes</h3>{installmentMessage && <p className="mt-2 text-sm">{installmentMessage}</p>}<div className="mt-3 space-y-2">{credits.flatMap((credit) => credit.cuotas.map((installment: any) => <form key={installment.id} action={async (data) => { const result = await registerInstallmentPayment(data); setInstallmentMessage(result.error ?? "Cobro registrado."); }} className="grid grid-cols-2 gap-2 rounded border p-2 text-xs md:grid-cols-6"><span>{credit.venta.cliente.nombre} {credit.venta.cliente.apellido}</span><span>Cuota #{installment.numero} · {new Date(installment.venceEn).toLocaleDateString("es-PY")}</span><span>{installment.estado} · saldo {formatMoney(installment.monto - installment.pagado)}</span><input type="hidden" name="installmentId" value={installment.id} /><input required name="amount" type="number" min="1" max={installment.monto - installment.pagado} placeholder="Monto" className="rounded border p-1" /><select name="paymentMethod" className="rounded border p-1"><option>EFECTIVO</option><option>TARJETA</option><option>TRANSFERENCIA</option></select><button className="rounded bg-slate-900 p-1 text-white">Registrar cobro</button></form>))}</div></section>
 
@@ -342,6 +381,17 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits }: Finanz
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Monto a Cobrar *</label>
                   <input required name="monto" type="number" min="1000" step="1000" max={selectedClient.saldoDeudor} defaultValue={selectedClient.saldoDeudor} className="w-full border rounded p-2 text-xs bg-white font-bold outline-none focus:border-slate-400" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Método de pago</label>
+                  <select name="metodoPago" className="w-full border rounded p-2 text-xs bg-white"><option>EFECTIVO</option><option>TARJETA</option><option>TRANSFERENCIA</option></select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Comprobante (URL)</label>
+                  <input name="comprobanteUrl" type="url" placeholder="Opcional" className="w-full border rounded p-2 text-xs bg-white" />
                 </div>
               </div>
 

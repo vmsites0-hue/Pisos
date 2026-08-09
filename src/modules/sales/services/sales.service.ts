@@ -17,6 +17,7 @@ import { validateSaleContract } from "@/modules/sales/domain/sale-validation";
 import { calcularDescuentoAutomatico } from "@/modules/discounts/services/discounts.service";
 import { buildDeliverySnapshot } from "@/modules/sales/domain/delivery";
 import { buildAmortizationSchedule } from "@/modules/credit/domain/amortization";
+import { recordFinancialMovement } from "@/modules/finance/services/financial-movements.service";
 
 export interface DetalleVentaInput {
   productoId: number;
@@ -253,6 +254,7 @@ export async function procesarVenta(input: VentaInput) {
         await tx.reservaStock.update({ where: { id: reservation.id }, data: { estado: activeLines === 0 ? "CONSUMIDA" : "PARCIALMENTE_CONSUMIDA" } });
       }
       if (creditSchedule && creditSchedule.totalInterest > 0) await tx.cliente.update({ where: { id: clienteId }, data: { saldoDeudor: { increment: creditSchedule.totalInterest } } });
+      await recordFinancialMovement(tx, { type: "INGRESO", category: "VENTA_DEVENGADA", amount: total, affectsResult: true, affectsCash: metodoPago !== "CREDITO", paymentMethod: metodoPago, userId: usuarioId, referenceType: "VENTA", referenceId: venta.id, description: `Venta confirmada #${venta.id}` });
       if (quotation) await tx.presupuesto.update({ where: { id: quotation.id }, data: { estado: "CONVERTIDO" } });
       if (approvedRequest) {
         const consumed = await tx.solicitudAprobacion.updateMany({ where: { id: approvedRequest.id, estado: "APROBADA", ejecutadoEn: null }, data: { estado: "EJECUTADA", ejecutadoEn: new Date() } });

@@ -1,0 +1,3 @@
+export type FinancialMovement = { type: "INGRESO" | "EGRESO"; amount: number; affectsResult: boolean; affectsCash: boolean };
+export function signedAmount(movement: FinancialMovement) { if (!Number.isFinite(movement.amount) || movement.amount < 0) throw new Error("El importe financiero es inválido."); return movement.type === "INGRESO" ? movement.amount : -movement.amount; }
+export function financialProjection(movements: FinancialMovement[]) { return movements.reduce((result, movement) => { const amount = signedAmount(movement); if (movement.affectsResult) result.commercialResult += amount; if (movement.affectsCash) result.cashFlow += amount; return result; }, { commercialResult: 0, cashFlow: 0 }); }

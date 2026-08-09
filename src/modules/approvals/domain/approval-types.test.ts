@@ -3,7 +3,7 @@ import { APPROVAL_TYPES, isApprovalType } from "./approval-types";
 
 describe("approval types", () => {
   it("recognizes every supported restricted operation", () => {
-    expect(Object.values(APPROVAL_TYPES)).toHaveLength(6);
+    expect(Object.values(APPROVAL_TYPES)).toHaveLength(7);
     for (const type of Object.values(APPROVAL_TYPES)) expect(isApprovalType(type)).toBe(true);
   });
 
