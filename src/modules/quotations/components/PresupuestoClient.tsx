@@ -15,7 +15,7 @@ import {
   X,
   Download
 } from "lucide-react";
-import { crearPresupuesto, eliminarPresupuesto } from "@/modules/quotations/actions/quotations.actions";
+import { actualizarPresupuesto, crearPresupuesto, eliminarPresupuesto } from "@/modules/quotations/actions/quotations.actions";
 import { ManualReservationForm } from "@/modules/reservations/components/ManualReservationForm";
 import { ReservationActions } from "@/modules/reservations/components/ReservationActions";
 
@@ -34,6 +34,9 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
   const [clienteId, setClienteId] = useState<number>(0);
   const [cart, setCart] = useState<any[]>([]);
   const [descuento, setDescuento] = useState<number>(0);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [expirationMode, setExpirationMode] = useState<"NONE" | "DEFAULT" | "CUSTOM">("NONE");
+  const [customExpiration, setCustomExpiration] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -215,6 +218,8 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
     const inputData = {
       clienteId,
       descuento,
+      expirationMode,
+      customExpiration: expirationMode === "CUSTOM" ? customExpiration : null,
       detalles: cart.map(item => ({
         productoId: item.productoId,
         varianteId: item.varianteId,
@@ -223,7 +228,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
       }))
     };
 
-    const res = await crearPresupuesto(inputData);
+    const res = editingId ? await actualizarPresupuesto(editingId, inputData) : await crearPresupuesto(inputData);
     setLoading(false);
 
     if (res.error) {
@@ -232,6 +237,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
       setCreatedPresupuesto(res.presupuesto);
       setCart([]);
       setDescuento(0);
+      setEditingId(null); setExpirationMode("NONE"); setCustomExpiration("");
       setShowReceipt(true);
     }
   }
@@ -248,6 +254,14 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
   const handleViewPresupuesto = (p: any) => {
     setCreatedPresupuesto(p);
     setShowReceipt(true);
+  };
+
+  const handleEditPresupuesto = (p: any) => {
+    setEditingId(p.id); setClienteId(p.clienteId); setDescuento(p.descuento);
+    setExpirationMode(p.venceEn ? "CUSTOM" : "NONE");
+    setCustomExpiration(p.venceEn ? new Date(new Date(p.venceEn).getTime() - new Date(p.venceEn).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "");
+    setCart(p.detalles.map((detail: any) => ({ productoId: detail.productoId, varianteId: detail.varianteId, codigo: detail.producto.codigo, nombre: detail.producto.nombre, unidadVenta: detail.producto.unidadVenta, m2PorCaja: detail.producto.m2PorCaja, precioVenta: detail.precioUnitario, cantidad: detail.cantidadSolicitada ?? detail.cantidad, cajas: detail.cantidadPresentacion?.toString() ?? "" })));
+    setActiveTab("crear"); setError(null);
   };
 
   const formatMoney = (val: number) => {
@@ -311,12 +325,11 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
                 </tr>
               ) : (
                 presupuestos.map((p) => {
-                  const limiteFecha = new Date(p.fecha);
-                  limiteFecha.setDate(limiteFecha.getDate() + p.validezDias);
+                  const limiteFecha = p.venceEn ? new Date(p.venceEn) : null;
                   
                   return (
                     <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 font-semibold text-slate-900">#PRES-{p.id}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-900">#PRES-{p.id}<span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[9px]">{p.estado}</span></td>
                       <td className="px-6 py-4 text-slate-500">
                         {new Date(p.fecha).toLocaleDateString("es-PY")}
                       </td>
@@ -325,7 +338,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
                         <div className="text-[10px] text-slate-500">CI: {p.cliente.documento}</div>
                       </td>
                       <td className="px-6 py-4 text-right font-medium text-slate-600">
-                        {p.validezDias} días (Hasta {limiteFecha.toLocaleDateString("es-PY")})
+                        {limiteFecha ? `Hasta ${limiteFecha.toLocaleDateString("es-PY")}` : "Sin vencimiento"}
                         {p.reservas?.map((reservation: any) => <span key={reservation.id} className="mt-1 block text-[10px] text-blue-700">Reserva #{reservation.id}: {reservation.estado}{reservation.venceEn ? ` · vence ${new Date(reservation.venceEn).toLocaleString("es-PY")}` : " · sin vencimiento"}</span>)}
                       </td>
                       <td className="px-6 py-4 text-right font-bold text-slate-900">
@@ -340,6 +353,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
                         >
                           Ver / Imprimir
                         </button>
+                        {p.estado === "ABIERTO" && <button onClick={() => handleEditPresupuesto(p)} className="rounded border bg-white px-2 py-1 text-xs font-semibold text-slate-600">Editar</button>}
                         <button
                           onClick={() => handleDeletePresupuesto(p.id)}
                           className="p-1.5 text-slate-400 hover:text-red-600 rounded transition-colors inline-block cursor-pointer"
@@ -581,12 +595,13 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
                 </div>
               </div>
 
+              <div className="mb-3 grid grid-cols-1 gap-2 border-t pt-3 sm:grid-cols-2"><label className="text-xs font-medium">Vigencia<select value={expirationMode} onChange={(event) => setExpirationMode(event.target.value as typeof expirationMode)} className="mt-1 w-full rounded border bg-white p-2"><option value="NONE">Sin vencimiento</option><option value="DEFAULT">Predeterminada</option><option value="CUSTOM">Fecha específica</option></select></label>{expirationMode === "CUSTOM" && <label className="text-xs font-medium">Vence en<input required type="datetime-local" value={customExpiration} onChange={(event) => setCustomExpiration(event.target.value)} className="mt-1 w-full rounded border p-2" /></label>}</div>
               <button
                 onClick={handleGuardarPresupuesto}
                 disabled={loading || cart.length === 0}
                 className="w-full bg-slate-950 hover:bg-slate-800 text-white py-3 rounded-lg text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow"
               >
-                {loading ? "Guardando..." : "Guardar Presupuesto"}
+                {loading ? "Guardando..." : editingId ? "Guardar cambios" : "Guardar Presupuesto"}
               </button>
             </div>
           </div>
@@ -602,7 +617,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
             <div className="bg-slate-950 p-4 text-white text-center flex flex-col items-center gap-2 relative">
               <FileText className="text-blue-400" size={36} />
               <div>
-                <h4 className="font-bold text-lg">Presupuesto / Cotización</h4>
+                <h4 className="font-bold text-lg">Presupuesto / Cotización</h4><p className="text-[10px] font-bold uppercase text-amber-600">Documento no fiscal</p>
                 <p className="text-slate-400 text-xs">Nro: #PRES-{createdPresupuesto.id}</p>
               </div>
               <button 

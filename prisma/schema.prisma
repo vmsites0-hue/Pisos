@@ -305,6 +305,7 @@ model PresentacionVariante {
 
   variante VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
   unidad UnidadMedida       @relation(fields: [unidadId], references: [id])
+  detallesPresupuesto DetallePresupuesto[]
 
   @@unique([varianteId, nombre])
   @@index([unidadId])
@@ -506,6 +507,9 @@ model Presupuesto {
   total          Float
   validezDias    Int                  @default(15)
   configuracionSnapshot String        @default("{}")
+  estado         String               @default("ABIERTO")
+  venceEn        DateTime?
+  actualizadoEn  DateTime             @updatedAt
   
   cliente        Cliente              @relation(fields: [clienteId], references: [id])
   sucursal       Sucursal             @relation(fields: [sucursalId], references: [id])
@@ -513,6 +517,7 @@ model Presupuesto {
   reservas       ReservaStock[]
 
   @@index([sucursalId])
+  @@index([estado, venceEn])
 }
 
 model DetallePresupuesto {
@@ -520,17 +525,20 @@ model DetallePresupuesto {
   presupuestoId  Int
   productoId     Int
   varianteId     Int?
+  presentacionId Int?
   
   cantidad       Float
   cantidadSolicitada Float?
   cantidadPresentacion Float?
   conversionSnapshot String @default("{}")
   precioUnitario Float
+  descuento      Float       @default(0)
   subtotal       Float
   
   presupuesto    Presupuesto @relation(fields: [presupuestoId], references: [id], onDelete: Cascade)
   producto       Producto    @relation(fields: [productoId], references: [id])
   variante       VarianteProducto? @relation(fields: [varianteId], references: [id])
+  presentacion   PresentacionVariante? @relation(fields: [presentacionId], references: [id])
   lineasReserva  LineaReservaStock[]
 }
 
