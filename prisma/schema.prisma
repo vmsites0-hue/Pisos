@@ -24,6 +24,8 @@ model Usuario {
   ventas      Venta[]
   sesiones    Sesion[]
   roles       UsuarioRol[]
+  aprobacionesSolicitadas SolicitudAprobacion[] @relation("SolicitanteAprobacion")
+  aprobacionesResueltas   SolicitudAprobacion[] @relation("AprobadorAprobacion")
 }
 
 model Rol {
@@ -71,6 +73,33 @@ model Sesion {
 
   @@index([usuarioId])
   @@index([expiraEn])
+}
+
+model SolicitudAprobacion {
+  id             Int       @id @default(autoincrement())
+  tipo           String
+  motivo         String
+  entidad        String?
+  entidadId      String?
+  valoresAntes   String?
+  valoresPropuestos String
+  estado         String    @default("PENDIENTE")
+  solicitanteId  Int
+  aprobadorId    Int?
+  solicitadoEn  DateTime  @default(now())
+  resueltoEn     DateTime?
+  ejecutadoEn    DateTime?
+
+  solicitante Usuario  @relation("SolicitanteAprobacion", fields: [solicitanteId], references: [id])
+  aprobador   Usuario? @relation("AprobadorAprobacion", fields: [aprobadorId], references: [id])
+
+  @@index([estado, solicitadoEn])
+  @@index([solicitanteId])
+}
+
+model PoliticaAprobacion {
+  id                       Int     @id @default(1)
+  permitirAutoAprobacion   Boolean @default(false)
 }
 
 // ==========================================
