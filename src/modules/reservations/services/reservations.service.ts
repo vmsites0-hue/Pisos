@@ -6,15 +6,18 @@ import { allocateReservation } from "@/modules/reservations/domain/reservation";
 import { recordInventoryMovement } from "@/modules/inventory/services/inventory-movements.service";
 import { syncMinimumStockAlert } from "@/modules/inventory/services/minimum-stock.service";
 import { recordAudit } from "@/modules/audit/services/audit.service";
+import { resolveReservationExpiration } from "@/modules/reservations/domain/expiration";
 
-export async function createManualReservation(input: { quotationId: number; lines: Array<{ quotationLineId: number; quantity: number }> }) {
+export async function createManualReservation(input: { quotationId: number; lines: Array<{ quotationLineId: number; quantity: number }>; expirationMode: "NONE" | "DEFAULT" | "CUSTOM"; customExpiration?: string | null }) {
   const user = await requirePermission(PERMISSIONS.RESERVATIONS_MANAGE);
   const requested = input.lines.filter((line) => Number.isFinite(line.quantity) && line.quantity > 0);
   if (!input.quotationId || requested.length === 0) throw new Error("Seleccione al menos una cantidad para reservar.");
+  const duration = await prisma.parametroSistema.findUnique({ where: { clave: "RESERVA_DURACION_DIAS" } });
+  const expiresAt = resolveReservationExpiration({ mode: input.expirationMode, customDate: input.customExpiration, defaultDays: Number(duration?.valor ?? 7), now: new Date() });
   const reservation = await prisma.$transaction(async (tx) => {
     const quotation = await tx.presupuesto.findUnique({ where: { id: input.quotationId }, include: { detalles: { include: { variante: { include: { unidadBase: true } }, lineasReserva: { where: { estado: "ACTIVA" } } } } } });
     if (!quotation) throw new Error("El presupuesto no existe.");
-    const header = await tx.reservaStock.create({ data: { presupuestoId: quotation.id, creadaPorId: user.id } });
+    const header = await tx.reservaStock.create({ data: { presupuestoId: quotation.id, creadaPorId: user.id, venceEn: expiresAt } });
     for (const request of requested) {
       const detail = quotation.detalles.find((line) => line.id === request.quotationLineId);
       if (!detail?.varianteId || !detail.variante) throw new Error("La línea no tiene una variante reservable.");
