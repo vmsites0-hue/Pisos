@@ -396,6 +396,9 @@ model DetalleVenta {
   productoId     Int
   
   cantidad       Float     // Puede ser m2 o cajas
+  cantidadSolicitada Float?
+  cantidadPresentacion Float?
+  conversionSnapshot String @default("{}")
   precioUnitario Float
   subtotal       Float
   
@@ -431,6 +434,9 @@ model DetallePresupuesto {
   productoId     Int
   
   cantidad       Float
+  cantidadSolicitada Float?
+  cantidadPresentacion Float?
+  conversionSnapshot String @default("{}")
   precioUnitario Float
   subtotal       Float
   
