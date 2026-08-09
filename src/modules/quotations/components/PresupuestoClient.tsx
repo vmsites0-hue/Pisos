@@ -15,7 +15,7 @@ import {
   X,
   Download
 } from "lucide-react";
-import { actualizarPresupuesto, crearPresupuesto, eliminarPresupuesto } from "@/modules/quotations/actions/quotations.actions";
+import { actualizarPresupuesto, crearPresupuesto, eliminarPresupuesto, recalcularPresupuesto } from "@/modules/quotations/actions/quotations.actions";
 import { ManualReservationForm } from "@/modules/reservations/components/ManualReservationForm";
 import { ReservationActions } from "@/modules/reservations/components/ReservationActions";
 
@@ -37,6 +37,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
   const [editingId, setEditingId] = useState<number | null>(null);
   const [expirationMode, setExpirationMode] = useState<"NONE" | "DEFAULT" | "CUSTOM">("NONE");
   const [customExpiration, setCustomExpiration] = useState("");
+  const [recalculationPolicy, setRecalculationPolicy] = useState("CONSERVAR");
 
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -220,6 +221,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
       descuento,
       expirationMode,
       customExpiration: expirationMode === "CUSTOM" ? customExpiration : null,
+      recalculationPolicy,
       detalles: cart.map(item => ({
         productoId: item.productoId,
         varianteId: item.varianteId,
@@ -237,7 +239,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
       setCreatedPresupuesto(res.presupuesto);
       setCart([]);
       setDescuento(0);
-      setEditingId(null); setExpirationMode("NONE"); setCustomExpiration("");
+      setEditingId(null); setExpirationMode("NONE"); setCustomExpiration(""); setRecalculationPolicy("CONSERVAR");
       setShowReceipt(true);
     }
   }
@@ -260,6 +262,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
     setEditingId(p.id); setClienteId(p.clienteId); setDescuento(p.descuento);
     setExpirationMode(p.venceEn ? "CUSTOM" : "NONE");
     setCustomExpiration(p.venceEn ? new Date(new Date(p.venceEn).getTime() - new Date(p.venceEn).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "");
+    setRecalculationPolicy(p.politicaRecalculo ?? "CONSERVAR");
     setCart(p.detalles.map((detail: any) => ({ productoId: detail.productoId, varianteId: detail.varianteId, codigo: detail.producto.codigo, nombre: detail.producto.nombre, unidadVenta: detail.producto.unidadVenta, m2PorCaja: detail.producto.m2PorCaja, precioVenta: detail.precioUnitario, cantidad: detail.cantidadSolicitada ?? detail.cantidad, cajas: detail.cantidadPresentacion?.toString() ?? "" })));
     setActiveTab("crear"); setError(null);
   };
@@ -354,6 +357,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
                           Ver / Imprimir
                         </button>
                         {p.estado === "ABIERTO" && <button onClick={() => handleEditPresupuesto(p)} className="rounded border bg-white px-2 py-1 text-xs font-semibold text-slate-600">Editar</button>}
+                        {p.estado === "ABIERTO" && p.politicaRecalculo === "MANUAL" && <button onClick={async () => { const result = await recalcularPresupuesto(p.id); if (result.error) alert(result.error); else alert(result.changed ? "Presupuesto actualizado por variaciones." : "No hubo variaciones; no se modificó."); }} className="rounded border bg-white px-2 py-1 text-xs font-semibold text-emerald-700">Recalcular</button>}
                         <button
                           onClick={() => handleDeletePresupuesto(p.id)}
                           className="p-1.5 text-slate-400 hover:text-red-600 rounded transition-colors inline-block cursor-pointer"
@@ -595,7 +599,7 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
                 </div>
               </div>
 
-              <div className="mb-3 grid grid-cols-1 gap-2 border-t pt-3 sm:grid-cols-2"><label className="text-xs font-medium">Vigencia<select value={expirationMode} onChange={(event) => setExpirationMode(event.target.value as typeof expirationMode)} className="mt-1 w-full rounded border bg-white p-2"><option value="NONE">Sin vencimiento</option><option value="DEFAULT">Predeterminada</option><option value="CUSTOM">Fecha específica</option></select></label>{expirationMode === "CUSTOM" && <label className="text-xs font-medium">Vence en<input required type="datetime-local" value={customExpiration} onChange={(event) => setCustomExpiration(event.target.value)} className="mt-1 w-full rounded border p-2" /></label>}</div>
+              <div className="mb-3 grid grid-cols-1 gap-2 border-t pt-3 sm:grid-cols-2"><label className="text-xs font-medium">Vigencia<select value={expirationMode} onChange={(event) => setExpirationMode(event.target.value as typeof expirationMode)} className="mt-1 w-full rounded border bg-white p-2"><option value="NONE">Sin vencimiento</option><option value="DEFAULT">Predeterminada</option><option value="CUSTOM">Fecha específica</option></select></label>{expirationMode === "CUSTOM" && <label className="text-xs font-medium">Vence en<input required type="datetime-local" value={customExpiration} onChange={(event) => setCustomExpiration(event.target.value)} className="mt-1 w-full rounded border p-2" /></label>}<label className="text-xs font-medium">Política de recálculo<select value={recalculationPolicy} onChange={(event) => setRecalculationPolicy(event.target.value)} className="mt-1 w-full rounded border bg-white p-2"><option value="CONSERVAR">Conservar valores originales</option><option value="MANUAL">Recalcular manualmente</option><option value="AL_CONVERTIR">Recalcular al convertir</option></select></label></div>
               <button
                 onClick={handleGuardarPresupuesto}
                 disabled={loading || cart.length === 0}

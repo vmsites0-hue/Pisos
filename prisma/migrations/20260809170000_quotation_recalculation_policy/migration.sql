@@ -1,0 +1,1 @@
+ALTER TABLE "Presupuesto" ADD COLUMN "politicaRecalculo" TEXT NOT NULL DEFAULT 'CONSERVAR';
