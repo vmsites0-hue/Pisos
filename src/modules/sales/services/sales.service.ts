@@ -144,8 +144,8 @@ export async function procesarVenta(input: VentaInput) {
         }
 
         // Descontar del inventario
-        await tx.inventario.update({
-          where: { id: inv!.id },
+        const claimedStock = await tx.inventario.updateMany({
+          where: { id: inv!.id, stockActual: inv!.stockActual, stockReservado: inv!.stockReservado },
           data: {
             stockActual: {
               decrement: conversion.actualQuantity,
@@ -153,6 +153,7 @@ export async function procesarVenta(input: VentaInput) {
             ...(reservedLine ? { stockReservado: { decrement: conversion.actualQuantity } } : {}),
           },
         });
+        if (claimedStock.count !== 1) throw new Error("El stock cambió por otra operación. Actualice y vuelva a intentar.");
         if (reservedLine) await tx.lineaReservaStock.update({ where: { id: reservedLine.id }, data: { estado: "CONSUMIDA" } });
         await recordInventoryMovement(tx, { inventoryId: inv!.id, variantId: variant.id, userId: usuarioId, type: "VENTA", quantity: -conversion.actualQuantity, baseUnit: variant.unidadBase?.codigo ?? producto.unidadVenta, previousBalance: stockActual, resultingBalance: stockActual - conversion.actualQuantity, reason: `Venta confirmada para cliente ${clienteId}`, referenceType: "VENTA", referenceId: operationReference });
         await syncPhysicalPackaging(tx, { inventoryId: inv!.id, previousStock: stockActual, userId: usuarioId, reason: `Consumo por venta para cliente ${clienteId}`, referenceType: "VENTA", referenceId: operationReference });
