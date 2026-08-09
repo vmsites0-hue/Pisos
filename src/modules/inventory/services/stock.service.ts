@@ -11,6 +11,7 @@ import { recordInventoryMovement } from "@/modules/inventory/services/inventory-
 import { consumeApproval } from "@/modules/approvals/services/approvals.service";
 import { APPROVAL_TYPES } from "@/modules/approvals/domain/approval-types";
 import { syncMinimumStockAlert } from "@/modules/inventory/services/minimum-stock.service";
+import { syncPhysicalPackaging } from "@/modules/inventory/services/open-presentations.service";
 
 type Adjustment = {
   productoId: number; varianteId: number; sucursalId: number; lote: string | null; tono: string | null; calibre: string | null;
@@ -31,6 +32,7 @@ async function applyAdjustment(tx: Prisma.TransactionClient, input: Adjustment) 
     ? await tx.inventario.update({ where: { id: existing.id }, data: { stockActual: balance, lote: input.lote, tono: input.tono, calibre: input.calibre, loteTono } })
     : await tx.inventario.create({ data: { productoId: input.productoId, varianteId: input.varianteId, sucursalId: input.sucursalId, lote: input.lote, tono: input.tono, calibre: input.calibre, loteTono, stockActual: balance } });
   await recordInventoryMovement(tx, { inventoryId: inventory.id, variantId: input.varianteId, userId: input.userId, type: delta >= 0 ? "INGRESO" : "AJUSTE", quantity: delta, baseUnit: variant.unidadBase?.codigo ?? "UNIDAD", previousBalance: previous, resultingBalance: balance, reason: input.motivo, referenceType: "AJUSTE_MANUAL", referenceId: inventory.id.toString() });
+  await syncPhysicalPackaging(tx, { inventoryId: inventory.id, previousStock: previous, userId: input.userId, reason: input.motivo, referenceType: "AJUSTE_MANUAL", referenceId: inventory.id.toString() });
   await syncMinimumStockAlert(tx, inventory.id, input.userId);
   await recordAudit({ userId: input.userId, action: "INVENTARIO_AJUSTADO", entity: "Inventario", entityId: inventory.id, before: existing, after: { ...inventory, tipoAjuste: input.tipoAjuste, motivo: input.motivo } }, tx);
   return { inventory, delta };

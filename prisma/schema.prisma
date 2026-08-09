@@ -29,6 +29,7 @@ model Usuario {
   auditorias              RegistroAuditoria[]
   movimientosInventario  MovimientoInventario[]
   notificaciones         Notificacion[]
+  eventosPresentacion    EventoPresentacionInventario[]
 }
 
 model Rol {
@@ -338,6 +339,8 @@ model Inventario {
   stockReservado  Float     @default(0)
   alertaMinimoActiva Boolean @default(false)
   alertaMinimoSecuencia Int @default(0)
+  presentacionesCerradas Int @default(0)
+  remanenteAbierto Float @default(0)
   
   actualizado     DateTime  @updatedAt
 
@@ -345,9 +348,29 @@ model Inventario {
   variante        VarianteProducto? @relation(fields: [varianteId], references: [id])
   sucursal        Sucursal  @relation(fields: [sucursalId], references: [id])
   movimientos     MovimientoInventario[]
+  eventosPresentacion EventoPresentacionInventario[]
 
   @@unique([productoId, sucursalId, loteTono])
   @@index([varianteId, sucursalId, lote, tono, calibre])
+}
+
+model EventoPresentacionInventario {
+  id             Int      @id @default(autoincrement())
+  inventarioId   Int
+  usuarioId      Int
+  tipo           String
+  cantidad       Float
+  remanenteAntes Float
+  remanenteDespues Float
+  motivo         String
+  referenciaTipo String?
+  referenciaId   String?
+  creadoEn       DateTime @default(now())
+
+  inventario Inventario @relation(fields: [inventarioId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([inventarioId, creadoEn])
 }
 
 model MovimientoInventario {
