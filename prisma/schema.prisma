@@ -15,7 +15,6 @@ model Usuario {
   nombre      String
   email       String    @unique
   password    String    // Hashed
-  rol         String    @default("VENDEDOR")
   sucursalId  Int?
   activo      Boolean   @default(true)
   creadoEn    DateTime  @default(now())
@@ -23,6 +22,102 @@ model Usuario {
 
   sucursal    Sucursal? @relation(fields: [sucursalId], references: [id])
   ventas      Venta[]
+  sesiones    Sesion[]
+  roles       UsuarioRol[]
+  aprobacionesSolicitadas SolicitudAprobacion[] @relation("SolicitanteAprobacion")
+  aprobacionesResueltas   SolicitudAprobacion[] @relation("AprobadorAprobacion")
+  auditorias              RegistroAuditoria[]
+}
+
+model Rol {
+  id          Int          @id @default(autoincrement())
+  codigo      String       @unique
+  nombre      String
+  activo      Boolean      @default(true)
+  usuarios    UsuarioRol[]
+  permisos    RolPermiso[]
+}
+
+model Permiso {
+  id          Int          @id @default(autoincrement())
+  codigo      String       @unique
+  descripcion String
+  roles       RolPermiso[]
+}
+
+model UsuarioRol {
+  usuarioId Int
+  rolId     Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  rol       Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, rolId])
+}
+
+model RolPermiso {
+  rolId     Int
+  permisoId Int
+  rol       Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+  permiso   Permiso @relation(fields: [permisoId], references: [id], onDelete: Cascade)
+
+  @@id([rolId, permisoId])
+}
+
+model Sesion {
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
+  usuarioId Int
+  expiraEn  DateTime
+  creadoEn  DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@index([expiraEn])
+}
+
+model SolicitudAprobacion {
+  id             Int       @id @default(autoincrement())
+  tipo           String
+  motivo         String
+  entidad        String?
+  entidadId      String?
+  valoresAntes   String?
+  valoresPropuestos String
+  estado         String    @default("PENDIENTE")
+  solicitanteId  Int
+  aprobadorId    Int?
+  solicitadoEn  DateTime  @default(now())
+  resueltoEn     DateTime?
+  ejecutadoEn    DateTime?
+
+  solicitante Usuario  @relation("SolicitanteAprobacion", fields: [solicitanteId], references: [id])
+  aprobador   Usuario? @relation("AprobadorAprobacion", fields: [aprobadorId], references: [id])
+
+  @@index([estado, solicitadoEn])
+  @@index([solicitanteId])
+}
+
+model PoliticaAprobacion {
+  id                       Int     @id @default(1)
+  permitirAutoAprobacion   Boolean @default(false)
+}
+
+model RegistroAuditoria {
+  id            Int       @id @default(autoincrement())
+  usuarioId     Int?
+  accion        String
+  entidad       String
+  entidadId     String?
+  datosAntes    String?
+  datosDespues  String?
+  creadoEn      DateTime  @default(now())
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([entidad, entidadId])
+  @@index([usuarioId, creadoEn])
+  @@index([creadoEn])
 }
 
 // ==========================================

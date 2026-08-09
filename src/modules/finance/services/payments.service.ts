@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requirePermission } from "@/modules/auth/services/access.service";
+import { PERMISSIONS } from "@/modules/auth/domain/permissions";
+import { recordAudit } from "@/modules/audit/services/audit.service";
 
 export async function registrarPagoCliente(clienteId: number, monto: number) {
+  const user = await requirePermission(PERMISSIONS.PAYMENTS_CREATE);
   try {
     if (isNaN(clienteId) || isNaN(monto) || monto <= 0) {
       return { error: "Monto o ID de cliente inválido." };
@@ -17,12 +21,13 @@ export async function registrarPagoCliente(clienteId: number, monto: number) {
 
     const nuevoSaldo = Math.max(0, cliente.saldoDeudor - monto);
 
-    await prisma.cliente.update({
+    const updated = await prisma.cliente.update({
       where: { id: clienteId },
       data: {
         saldoDeudor: nuevoSaldo,
       },
     });
+    await recordAudit({ userId: user.id, action: "COBRO_REGISTRADO", entity: "Cliente", entityId: clienteId, before: cliente, after: updated });
 
     revalidatePath("/finanzas");
     revalidatePath("/clientes");

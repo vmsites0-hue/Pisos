@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requirePermission } from "@/modules/auth/services/access.service";
+import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 
 export async function createSucursal(formData: FormData) {
+  await requirePermission(PERMISSIONS.BRANCHES_MANAGE);
   const nombre = formData.get("nombre") as string;
   const direccion = formData.get("direccion") as string;
   const telefono = formData.get("telefono") as string;
@@ -22,6 +25,7 @@ export async function createSucursal(formData: FormData) {
 }
 
 export async function updateSucursal(id: number, formData: FormData) {
+  await requirePermission(PERMISSIONS.BRANCHES_MANAGE);
   const nombre = formData.get("nombre") as string;
   const direccion = formData.get("direccion") as string;
   const telefono = formData.get("telefono") as string;
@@ -41,6 +45,7 @@ export async function updateSucursal(id: number, formData: FormData) {
 }
 
 export async function deleteSucursal(id: number) {
+  await requirePermission(PERMISSIONS.BRANCHES_MANAGE);
   try {
     // Verificar que no tenga inventario asociado
     const invCount = await prisma.inventario.count({ where: { sucursalId: id } });
@@ -68,6 +73,7 @@ export async function deleteSucursal(id: number) {
 }
 
 export async function toggleSucursal(id: number, activa: boolean) {
+  await requirePermission(PERMISSIONS.BRANCHES_MANAGE);
   try {
     await prisma.sucursal.update({
       where: { id },

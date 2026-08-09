@@ -50,7 +50,23 @@ El seed es idempotente y crea, si no existen:
 - Categorías comerciales iniciales.
 - Usuario administrador indicado en las variables `SEED_ADMIN_*`.
 
-La contraseña se almacena mediante scrypt. El módulo definitivo de autenticación se implementará en la épica E01.
+La contraseña se almacena mediante scrypt. Después del seed, se inicia sesión en
+`/login` con `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD`. Las sesiones duran 12
+horas, pueden revocarse en la base y dejan de ser válidas si el usuario se desactiva.
+
+En `/configuracion` el administrador puede crear empleados, asignarles varios
+roles, cambiar el nombre visible de los roles y configurar sus permisos. Los
+códigos internos de permisos son estables y todas las mutaciones se autorizan
+de nuevo en el servidor.
+
+La bandeja `/aprobaciones` gestiona autorizaciones para descuentos fuera de
+límite, cambios manuales de precio, ajustes negativos, cancelaciones,
+devoluciones y eliminación de gastos. Por defecto nadie puede aprobar su propia
+solicitud y cada aprobación puede consumirse una sola vez.
+
+`/auditoria` ofrece un registro de solo lectura para accesos y operaciones
+sensibles. Contraseñas, tokens, cookies y secretos se redactan antes de guardar
+los valores anteriores o posteriores.
 
 ## Base local histórica
 
@@ -105,6 +121,9 @@ pnpm check
 | `pnpm db:deploy` | Aplicar migraciones versionadas |
 | `pnpm db:seed` | Crear datos mínimos iniciales |
 | `pnpm db:studio` | Abrir Prisma Studio |
+| `pnpm test` | Ejecutar pruebas unitarias una vez |
+| `pnpm test:watch` | Ejecutar pruebas unitarias en modo interactivo |
+| `pnpm check` | TypeScript, lint, tests unitarios y build de producción |
 
 ## Arquitectura
 

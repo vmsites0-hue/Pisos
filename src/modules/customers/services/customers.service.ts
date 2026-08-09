@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requirePermission } from "@/modules/auth/services/access.service";
+import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 
 export async function createCliente(formData: FormData) {
+  await requirePermission(PERMISSIONS.CUSTOMERS_MANAGE);
   try {
     const nombre = (formData.get("nombre") as string)?.trim();
     const apellido = (formData.get("apellido") as string)?.trim();
@@ -58,6 +61,7 @@ export async function createCliente(formData: FormData) {
 }
 
 export async function updateCliente(id: number, formData: FormData) {
+  await requirePermission(PERMISSIONS.CUSTOMERS_MANAGE);
   try {
     const nombre = (formData.get("nombre") as string)?.trim();
     const apellido = (formData.get("apellido") as string)?.trim();
@@ -114,6 +118,7 @@ export async function updateCliente(id: number, formData: FormData) {
 }
 
 export async function deleteCliente(id: number) {
+  await requirePermission(PERMISSIONS.CUSTOMERS_MANAGE);
   try {
     // Verificar si tiene ventas asociadas
     const ventasCount = await prisma.venta.count({

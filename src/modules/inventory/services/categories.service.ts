@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requirePermission } from "@/modules/auth/services/access.service";
+import { PERMISSIONS } from "@/modules/auth/domain/permissions";
 
 export async function createCategoria(nombre: string) {
+  await requirePermission(PERMISSIONS.PRODUCTS_MANAGE);
   const normalizedNombre = nombre.trim();
   if (!normalizedNombre) {
     return { error: "El nombre de la categoría es requerido." };
@@ -30,6 +33,7 @@ export async function createCategoria(nombre: string) {
 }
 
 export async function deleteCategoria(id: number) {
+  await requirePermission(PERMISSIONS.PRODUCTS_MANAGE);
   try {
     // Verificar si tiene productos asociados
     const productosCount = await prisma.producto.count({

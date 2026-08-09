@@ -1,8 +1,10 @@
 import { getDashboardData } from "@/modules/dashboard/repositories/dashboard.repository";
 import { Package, ShoppingCart, TrendingUp, Users, Store, Clock, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { requireAuthenticatedUser } from "@/modules/auth/services/session.service";
 
 export default async function DashboardPage() {
+  await requireAuthenticatedUser();
   const {
     todaySales: ventasHoy,
     pendingOrders: pedidosPendientes,
