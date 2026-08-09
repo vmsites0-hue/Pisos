@@ -37,6 +37,7 @@ model Usuario {
   eventosEntrega         EventoEntrega[]
   entregasComoEncargado  Entrega[] @relation("EntregaEncargado")
   entregasComoChofer     Entrega[] @relation("EntregaChofer")
+  entregasConfirmadas    Entrega[] @relation("EntregaConfirmadaPor")
 }
 
 model Rol {
@@ -520,11 +521,15 @@ model Entrega {
   observaciones   String?
   encargadoId     Int?
   choferId        Int?
+  confirmadoPorId Int?
+  confirmadoEn   DateTime?
+  evidenciaUrl   String?
   creadaEn        DateTime @default(now())
   actualizadaEn   DateTime @updatedAt
   venta           Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   encargado       Usuario? @relation("EntregaEncargado", fields: [encargadoId], references: [id])
   chofer          Usuario? @relation("EntregaChofer", fields: [choferId], references: [id])
+  confirmadoPor   Usuario? @relation("EntregaConfirmadaPor", fields: [confirmadoPorId], references: [id])
   eventos         EventoEntrega[]
 
   @@index([estado, creadaEn])
