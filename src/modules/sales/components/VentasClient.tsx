@@ -24,6 +24,7 @@ import { availableStock, matchesCatalogQuery } from "@/modules/sales/domain/cata
 import { cancelSaleAction } from "@/modules/returns/actions/sale-cancellations.actions";
 import { registerReturnAction } from "@/modules/returns/actions/returns.actions";
 import { simulateCredit } from "@/modules/credit/actions/credit-schedules.actions";
+import { generateSaleTicketPDF } from "@/lib/pdf-generator";
 
 interface VentasClientProps {
   products: any[];
@@ -74,26 +75,10 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
     if (!createdVenta) return;
     setDownloading(true);
     try {
-      const element = document.getElementById("venta-pdf-area");
-      if (!element) return;
-
-      const html2canvas = (await import("html2canvas")).default;
-      const { jsPDF } = await import("jspdf");
-
-      const noPrintElements = element.querySelectorAll(".no-print");
-      noPrintElements.forEach((el: any) => { el.style.display = "none"; });
-
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-      noPrintElements.forEach((el: any) => { el.style.display = ""; });
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const imgWidth = 190;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
-      pdf.save(`comprobante-interno-venta-${createdVenta.id}.pdf`);
+      generateSaleTicketPDF(createdVenta);
     } catch (err) {
       console.error(err);
+      setError("Error al generar el PDF del ticket.");
     } finally {
       setDownloading(false);
     }
@@ -104,12 +89,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
     if (sucursales.length > 0) {
       setSucursalId(sucursales[0].id);
     }
-    if (clientes.length > 0) {
-      // Buscar cliente general o el primero
-      const general = clientes.find(c => c.nombre.toLowerCase().includes("general") || c.apellido.toLowerCase().includes("general"));
-      setClienteId(general ? general.id : clientes[0].id);
-    }
-  }, [sucursales, clientes]);
+  }, [sucursales]);
 
   // Limpiar el carrito si cambia la sucursal
   useEffect(() => {
@@ -319,7 +299,12 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
   // Procesar Venta
   async function handleConfirmarVenta() {
     if (cart.length === 0) return;
-    if (!clienteId || !sucursalId) return;
+    if (!sucursalId) return;
+
+    if (metodoPago === "CREDITO" && (!clienteId || clienteId === 0)) {
+      setError("Para ventas a crédito es obligatorio seleccionar un cliente registrado con línea de crédito.");
+      return;
+    }
 
     if (creditoExcedido) {
       setError("No se puede confirmar la venta: El cliente excede su límite de crédito.");
@@ -331,7 +316,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
 
     const inputData = {
       sucursalId,
-      clienteId,
+      clienteId: clienteId > 0 ? clienteId : null,
       descuento,
       reglaDescuentoId: reglaAplicadaId,
       descuentoAutomatico: descuentoAuto,
@@ -366,7 +351,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[calc(100vh-8rem)]">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[calc(100vh-8rem)] no-print">
       
       {/* PANEL IZQUIERDO: Catálogo y Búsqueda (cols: 7) */}
       <div className="lg:col-span-7 space-y-6 flex flex-col">
@@ -514,16 +499,20 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
 
           {/* Selector de Cliente */}
           <div className="space-y-1">
-            <label className="block text-xs font-semibold text-slate-600 flex items-center gap-1">
-              <User size={12} />
-              <span>Cliente Facturación *</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-600 flex items-center gap-1">
+                <User size={12} />
+                <span>Cliente Facturación</span>
+              </label>
+              <span className="text-[10px] text-slate-400 font-normal">(Opcional al contado)</span>
+            </div>
             <select
               value={clienteId}
-              onChange={(e) => setClienteId(parseInt(e.target.value))}
-              className="w-full border rounded-md p-2 text-sm bg-white outline-none focus:border-slate-400 font-semibold"
+              onChange={(e) => setClienteId(parseInt(e.target.value) || 0)}
+              className="w-full border rounded-md p-2 text-sm bg-white outline-none focus:border-slate-400 font-semibold text-slate-800"
             >
-              {clientes.map(c => (
+              <option value="0">👤 Consumidor Final / Cliente Ocasional (Sin registrar)</option>
+              {clientes.filter(c => c.documento !== "0").map(c => (
                 <option key={c.id} value={c.id}>
                   {c.nombre} {c.apellido} (CI: {c.documento})
                 </option>

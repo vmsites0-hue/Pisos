@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { X, Calculator } from "lucide-react";
 import { ajustarStock } from "@/modules/inventory/actions/stock.actions";
 
@@ -12,7 +13,8 @@ interface StockFormProps {
   preselectedProductId?: number | null;
 }
 
-export function StockForm({ isOpen, onClose, products, sucursales, preselectedProductId }: StockFormProps) {
+export function StockForm({ isOpen, onClose, products = [], sucursales = [], preselectedProductId }: StockFormProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -125,6 +127,7 @@ export function StockForm({ isOpen, onClose, products, sucursales, preselectedPr
     if (res.error) {
       setError(res.error);
     } else {
+      router.refresh();
       onClose();
     }
   }

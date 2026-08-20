@@ -34,7 +34,7 @@ export interface DetalleVentaInput {
 
 export interface VentaInput {
   sucursalId: number;
-  clienteId: number;
+  clienteId?: number | null;
   descuento: number;
   metodoPago: string;
   tipoEntrega?: string; // ENVIO o RETIRO
@@ -48,6 +48,44 @@ export interface VentaInput {
   creditPlanId?: number | null;
 }
 
+async function resolveSaleCustomer(clienteId: number | null | undefined, sucursalId: number, tx: any) {
+  if (clienteId && clienteId > 0) {
+    const cliente = await tx.cliente.findUnique({
+      where: { id: clienteId },
+    });
+    if (!cliente || !cliente.activo) {
+      throw new Error("El cliente seleccionado no existe o está inactivo.");
+    }
+    return cliente;
+  }
+
+  // Buscar o crear cliente genérico / consumidor final para ventas sin registrar
+  let defaultCustomer = await tx.cliente.findFirst({
+    where: {
+      documento: "0",
+    },
+  });
+
+  if (!defaultCustomer) {
+    defaultCustomer = await tx.cliente.create({
+      data: {
+        sucursalId,
+        nombre: "Consumidor",
+        apellido: "Final",
+        tipo: "PERSONA",
+        documento: "0",
+        telefono: null,
+        direccion: null,
+        limiteCredito: 0,
+        saldoDeudor: 0,
+        activo: true,
+      },
+    });
+  }
+
+  return defaultCustomer;
+}
+
 export async function procesarVenta(input: VentaInput) {
   const authenticatedUser = await requirePermission(PERMISSIONS.SALES_CREATE);
   const mainBranch = await getMainBranch();
@@ -55,9 +93,9 @@ export async function procesarVenta(input: VentaInput) {
   const operationReference = randomUUID();
 
   try {
-    const { clienteId, descuento: requestedDiscount, metodoPago, tipoEntrega = "ENVIO", detalles, reservaId, presupuestoId, descuentoAutomatico: clientAutomaticDiscount = 0 } = input;
+    const { clienteId: inputClienteId, descuento: requestedDiscount, metodoPago, tipoEntrega = "ENVIO", detalles, reservaId, presupuestoId, descuentoAutomatico: clientAutomaticDiscount = 0 } = input;
     const sucursalId = mainBranch.id;
-    validateSaleContract({ clienteId, metodoPago, tipoEntrega, detalles });
+    validateSaleContract({ clienteId: inputClienteId, metodoPago, tipoEntrega, detalles });
 
     const referencePrices = await Promise.all(detalles.map(async (item) => {
       const product = await prisma.producto.findUnique({ where: { id: item.productoId }, include: { variantes: { where: { activa: true, ...(item.varianteId ? { id: item.varianteId } : {}) }, orderBy: { id: "asc" }, take: 1 } } });
@@ -66,7 +104,7 @@ export async function procesarVenta(input: VentaInput) {
     }));
     const estimatedSubtotal = referencePrices.reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
     const manualDiscount = Math.max(0, requestedDiscount - clientAutomaticDiscount);
-    const serverPromotion = await calcularDescuentoAutomatico(referencePrices.map((item) => ({ productoId: item.productoId, varianteId: item.varianteId, categoriaId: item.categoriaId, familiaId: item.familiaId, marcaId: item.marcaId, cantidad: item.cantidad, precioUnitario: item.precioUnitario, subtotal: item.cantidad * item.precioUnitario })), clienteId);
+    const serverPromotion = await calcularDescuentoAutomatico(referencePrices.map((item) => ({ productoId: item.productoId, varianteId: item.varianteId, categoriaId: item.categoriaId, familiaId: item.familiaId, marcaId: item.marcaId, cantidad: item.cantidad, precioUnitario: item.precioUnitario, subtotal: item.cantidad * item.precioUnitario })), inputClienteId);
     const descuentoAutomatico = serverPromotion.monto;
     const reglaDescuentoId = serverPromotion.reglaAplicadaId;
     const descuento = manualDiscount + descuentoAutomatico;
@@ -83,7 +121,7 @@ export async function procesarVenta(input: VentaInput) {
       if (!approvedRequest) return { error: "La aprobación comercial no es válida, no está aprobada o ya fue utilizada." };
     }
 
-    if (!clienteId || !metodoPago || detalles.length === 0) {
+    if (!metodoPago || detalles.length === 0) {
       return { error: "Faltan datos obligatorios para procesar la venta." };
     }
 
@@ -91,13 +129,9 @@ export async function procesarVenta(input: VentaInput) {
 
     // Ejecutar transacción
     const ventaProcesada = await prisma.$transaction(async (tx) => {
-      // 1. Validar cliente
-      const cliente = await tx.cliente.findUnique({
-        where: { id: clienteId },
-      });
-      if (!cliente || !cliente.activo) {
-        throw new Error("El cliente seleccionado no existe.");
-      }
+      // 1. Validar y resolver cliente
+      const cliente = await resolveSaleCustomer(inputClienteId, sucursalId, tx);
+      const clienteId = cliente.id;
 
       const quotation = presupuestoId ? await tx.presupuesto.findUnique({ where: { id: presupuestoId }, include: { venta: { select: { id: true } } } }) : null;
       if (presupuestoId && !quotation) throw new Error("El presupuesto indicado no existe.");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Trash2, FolderPlus, X } from "lucide-react";
 import { createCategoria, deleteCategoria } from "@/modules/inventory/actions/categories.actions";
 
@@ -9,6 +10,7 @@ interface CategoryFormProps {
 }
 
 export function CategoryForm({ categories }: CategoryFormProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -31,7 +33,7 @@ export function CategoryForm({ categories }: CategoryFormProps) {
     } else {
       setSuccess("Categoría agregada correctamente.");
       setNombre("");
-      // Limpiar mensaje de éxito después de un tiempo
+      router.refresh();
       setTimeout(() => setSuccess(null), 3000);
     }
   }
@@ -47,6 +49,7 @@ export function CategoryForm({ categories }: CategoryFormProps) {
       setError(res.error);
     } else {
       setSuccess("Categoría eliminada.");
+      router.refresh();
       setTimeout(() => setSuccess(null), 3000);
     }
   }

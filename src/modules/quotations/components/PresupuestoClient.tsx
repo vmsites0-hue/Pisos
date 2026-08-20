@@ -16,6 +16,7 @@ import {
   Download
 } from "lucide-react";
 import { actualizarPresupuesto, compararVariacionesPresupuesto, crearPresupuesto, eliminarPresupuesto, recalcularPresupuesto } from "@/modules/quotations/actions/quotations.actions";
+import { generateQuotationPDF } from "@/lib/pdf-generator";
 import { ManualReservationForm } from "@/modules/reservations/components/ManualReservationForm";
 import { ReservationActions } from "@/modules/reservations/components/ReservationActions";
 
@@ -52,40 +53,10 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
     setDownloading(true);
     setError(null);
     try {
-      const element = document.getElementById("presupuesto-pdf-area");
-      if (!element) return;
-
-      // Importar dinámicamente en el cliente
-      const html2canvas = (await import("html2canvas")).default;
-      const { jsPDF } = await import("jspdf");
-
-      // Ocultar botones no-print temporalmente
-      const noPrintElements = element.querySelectorAll(".no-print");
-      noPrintElements.forEach((el: any) => {
-        el.style.display = "none";
-      });
-
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
-
-      // Restaurar visualización
-      noPrintElements.forEach((el: any) => {
-        el.style.display = "";
-      });
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const imgWidth = 190;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
-      pdf.save(`presupuesto-${createdPresupuesto.id}.pdf`);
+      generateQuotationPDF(createdPresupuesto);
     } catch (err: any) {
       console.error(err);
-      setError("Error al generar el PDF. Inténtalo de nuevo.");
+      setError("Error al generar el PDF del presupuesto.");
     } finally {
       setDownloading(false);
     }
@@ -274,7 +245,8 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
 
   return (
     <div className="space-y-6">
-      {/* Encabezado */}
+      <div className="space-y-6 no-print">
+        {/* Encabezado */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Presupuestos y Cotizaciones</h2>
@@ -653,6 +625,8 @@ export function PresupuestoClient({ products, clientes, categories, presupuestos
           </div>
         </div>
       )}
+
+      </div>
 
       {/* MODAL DE RECIBO / PRESUPUESTO */}
       {showReceipt && createdPresupuesto && (

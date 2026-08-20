@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { createProducto, updateProducto } from "@/modules/inventory/actions/products.actions";
 import { createCategoria } from "@/modules/inventory/actions/categories.actions";
@@ -13,7 +14,8 @@ interface ProductFormProps {
   units: { id: number; codigo: string; nombre: string; simbolo: string; precision: number; admiteDecimales: boolean }[];
 }
 
-export function ProductForm({ isOpen, onClose, product, categories, units }: ProductFormProps) {
+export function ProductForm({ isOpen, onClose, product, categories = [], units = [] }: ProductFormProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unidadVenta, setUnidadVenta] = useState("UNIDAD");
@@ -59,6 +61,7 @@ export function ProductForm({ isOpen, onClose, product, categories, units }: Pro
       setSelectedCategory(res.category.id.toString());
       setNewCatName("");
       setShowInlineCat(false);
+      router.refresh();
     }
   }
 
@@ -84,6 +87,7 @@ export function ProductForm({ isOpen, onClose, product, categories, units }: Pro
     if (res.error) {
       setError(res.error);
     } else {
+      router.refresh();
       onClose();
     }
   }
@@ -91,8 +95,6 @@ export function ProductForm({ isOpen, onClose, product, categories, units }: Pro
   const isM2OrCaja = unidadVenta === "M2" || unidadVenta === "CAJA";
   const primaryVariant = product?.variantes?.[0];
   const extraPresentation = primaryVariant?.presentaciones?.find((item: any) => !item.predeterminada);
-  const selectedAttributes = categories.find((category) => category.id.toString() === selectedCategory)?.familia?.atributos ?? [];
-  const currentValues = new Map<number, string>((product?.variantes?.[0]?.valores ?? []).map((item: any) => [item.atributoId, item.valor]));
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -113,35 +115,6 @@ export function ProductForm({ isOpen, onClose, product, categories, units }: Pro
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {selectedAttributes.length > 0 && (
-            <fieldset className="rounded-lg border p-4">
-              <legend className="px-2 text-sm font-semibold text-slate-700">Características de la variante</legend>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                {selectedAttributes.map((attribute) => {
-                  const name = `atributo_${attribute.id}`;
-                  const defaultValue = currentValues.get(attribute.id) ?? "";
-                  const options: string[] = attribute.opciones ? JSON.parse(attribute.opciones) : [];
-                  return (
-                    <label key={attribute.id} className="block text-sm font-medium text-slate-700">
-                      {attribute.nombre}{attribute.obligatorio ? " *" : ""}
-                      {attribute.tipo === "SELECCION" ? (
-                        <select name={name} required={attribute.obligatorio} defaultValue={defaultValue} className="mt-1 w-full rounded-md border bg-white p-2 text-sm">
-                          <option value="">Seleccionar...</option>
-                          {options.map((option) => <option key={option} value={option}>{option}</option>)}
-                        </select>
-                      ) : attribute.tipo === "BOOLEANO" ? (
-                        <select name={name} required={attribute.obligatorio} defaultValue={defaultValue} className="mt-1 w-full rounded-md border bg-white p-2 text-sm">
-                          <option value="">Seleccionar...</option><option value="true">Sí</option><option value="false">No</option>
-                        </select>
-                      ) : (
-                        <input name={name} required={attribute.obligatorio} type={attribute.tipo === "NUMERO" ? "number" : "text"} step={attribute.tipo === "NUMERO" ? "any" : undefined} defaultValue={defaultValue} className="mt-1 w-full rounded-md border p-2 text-sm" />
-                      )}
-                    </label>
-                  );
-                })}
-              </div>
-            </fieldset>
-          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Código */}
             <div>

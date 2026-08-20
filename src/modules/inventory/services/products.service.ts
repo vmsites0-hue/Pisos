@@ -15,9 +15,10 @@ async function resolveClassifications(categoriaId: number, marca: string | null)
 }
 
 async function resolveVariantValues(categoriaId: number, formData: FormData) {
+  const values = readVariantValues(formData);
+  if (values.size === 0) return [];
   const category = await prisma.categoria.findUnique({ where: { id: categoriaId }, include: { familia: { include: { atributos: { where: { activo: true } } } } } });
   const definitions = category?.familia?.atributos ?? [];
-  const values = readVariantValues(formData);
   const errors = validateVariantValues(definitions, values);
   if (errors.length) throw new Error(errors.join(" "));
   return [...values].filter(([id]) => definitions.some((item) => item.id === id)).map(([atributoId, valor]) => ({ atributoId, valor }));

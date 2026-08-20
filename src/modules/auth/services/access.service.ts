@@ -34,3 +34,31 @@ export async function hasPermission(permissionCode: PermissionCode) {
     throw error;
   }
 }
+
+export async function getUserPermissions(userId: number): Promise<string[]> {
+  const userRoles = await prisma.usuarioRol.findMany({
+    where: {
+      usuarioId: userId,
+      rol: { activo: true },
+    },
+    include: {
+      rol: {
+        include: {
+          permisos: {
+            include: { permiso: true },
+          },
+        },
+      },
+    },
+  });
+
+  const permissions = new Set<string>();
+  for (const ur of userRoles) {
+    for (const rp of ur.rol.permisos) {
+      permissions.add(rp.permiso.codigo);
+    }
+  }
+
+  return Array.from(permissions);
+}
+

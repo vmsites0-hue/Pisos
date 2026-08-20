@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { 
   PackagePlus, 
   Search, 
@@ -20,17 +21,27 @@ import { StockForm } from "./StockForm";
 import { deleteProducto } from "@/modules/inventory/actions/products.actions";
 
 interface InventarioClientProps {
-  products: any[];
-  categories: any[];
-  families: any[];
-  brands: any[];
-  units: any[];
-  sucursales: any[];
-  inventarios: any[];
-  movements: any[];
+  products?: any[];
+  categories?: any[];
+  families?: any[];
+  brands?: any[];
+  units?: any[];
+  sucursales?: any[];
+  inventarios?: any[];
+  movements?: any[];
 }
 
-export function InventarioClient({ products, categories, families, brands, units, sucursales, inventarios, movements }: InventarioClientProps) {
+export function InventarioClient({ 
+  products = [], 
+  categories = [], 
+  families = [], 
+  brands = [], 
+  units = [], 
+  sucursales = [], 
+  inventarios = [], 
+  movements = [] 
+}: InventarioClientProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"catalogo" | "stock" | "movimientos">("catalogo");
   
   // Filtros y búsquedas
@@ -91,6 +102,8 @@ export function InventarioClient({ products, categories, families, brands, units
     if (res.error) {
       setError(res.error);
       alert(res.error); // Alerta flotante rápida para no arruinar la vista
+    } else {
+      router.refresh();
     }
   }
 

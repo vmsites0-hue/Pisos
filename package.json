@@ -5,6 +5,7 @@
   "packageManager": "pnpm@11.8.0",
   "scripts": {
     "dev": "next dev",
+    "tunnel": "node scripts/tunnel.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -16,10 +17,10 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
-    ,"db:backup": "node scripts/db-maintenance.mjs backup"
-    ,"db:restore": "node scripts/db-maintenance.mjs restore"
-    ,"db:verify-migrations": "node scripts/verify-migrations.mjs"
+    "db:studio": "prisma studio",
+    "db:backup": "node scripts/db-maintenance.mjs backup",
+    "db:restore": "node scripts/db-maintenance.mjs restore",
+    "db:verify-migrations": "node scripts/verify-migrations.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -40,6 +41,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@ngrok/ngrok": "^1.7.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
