@@ -1,14 +1,18 @@
 import { randomBytes, scryptSync } from "node:crypto";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
-const databaseUrl = process.env.DATABASE_URL ?? "file:./dev.db";
+const databaseUrl = process.env.DATABASE_URL;
 const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@erpiso.local";
 const adminName = process.env.SEED_ADMIN_NAME ?? "Administrador";
 const adminPassword = process.env.SEED_ADMIN_PASSWORD;
 
 if (!adminPassword) {
   throw new Error("SEED_ADMIN_PASSWORD es obligatoria para ejecutar el seed.");
+}
+
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL es obligatoria para conectar con PostgreSQL.");
 }
 
 function hashPassword(password) {
@@ -18,7 +22,7 @@ function hashPassword(password) {
   return `scrypt$${salt}$${hash}`;
 }
 
-const adapter = new PrismaBetterSqlite3({ url: databaseUrl });
+const adapter = new PrismaPg({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
 const permissions = [

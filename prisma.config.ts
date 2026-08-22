@@ -2,11 +2,12 @@
 // npm install --save-dev prisma dotenv
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
-import { resolveSqliteUrl } from "./src/lib/sqlite-url";
 
-const databaseUrl = resolveSqliteUrl(
-  process.env["DATABASE_URL"] ?? "file:./dev.db",
-);
+const databaseUrl = process.env["DATABASE_URL"];
+
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL es obligatoria para conectar con PostgreSQL.");
+}
 
 export default defineConfig({
   schema: "prisma/schema.prisma",

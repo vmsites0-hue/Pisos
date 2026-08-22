@@ -7,7 +7,17 @@ RUN pnpm install --frozen-lockfile
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ENV DATABASE_URL=postgresql://build:build@localhost:5432/build?schema=public
 RUN pnpm prisma generate && pnpm build
+
+FROM base AS migrator
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json prisma.config.ts ./
+COPY prisma ./prisma
+ENV DATABASE_URL=postgresql://build:build@localhost:5432/build?schema=public
+RUN ./node_modules/.bin/prisma generate
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && ./node_modules/.bin/prisma db seed"]
+
 FROM node:22-alpine AS runner
 ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
