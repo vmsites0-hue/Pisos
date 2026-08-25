@@ -109,6 +109,21 @@ async function main() {
     });
   }
 
+  // Unidades de medida base
+  const unitDefs = [
+    ["UNIDAD", "Unidad", "ud", 0, false],
+    ["M2",     "Metro cuadrado", "m²", 2, true],
+    ["ML",     "Metro lineal", "ml", 2, true],
+    ["CAJA",   "Caja", "cj", 0, false],
+  ];
+  for (const [codigo, nombre, simbolo, precision, admiteDecimales] of unitDefs) {
+    await prisma.unidadMedida.upsert({
+      where: { codigo },
+      update: { nombre, simbolo, precision, admiteDecimales, activa: true },
+      create: { codigo, nombre, simbolo, precision, admiteDecimales, activa: true },
+    });
+  }
+
   const floorFamily = await prisma.familia.findUniqueOrThrow({ where: { nombre: "Pisos" } });
   const floorAttributes = [
     ["ANCHO", "Ancho", "NUMERO", true, true, true, null],
