@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "ERPiso Empleados",
-    short_name: "ERPiso",
+    name: "Distri Pisos Empleados",
+    short_name: "Distri Pisos",
     description: "Ventas, inventario y logística para empleados",
     start_url: "/",
     display: "standalone",

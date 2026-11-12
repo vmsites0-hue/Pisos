@@ -7,7 +7,7 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(fetch(event.request).catch(() => caches.match(OFFLINE)));
 });
 self.addEventListener("push", (event) => {
-  const data = event.data ? event.data.json() : { title: "ERPiso", body: "Tenés una nueva notificación." };
+  const data = event.data ? event.data.json() : { title: "Distri Pisos", body: "Tenés una nueva notificación." };
   event.waitUntil(self.registration.showNotification(data.title, { body: data.body, icon: "/icons/icon-192.svg", data: { url: data.url || "/notificaciones" } }));
 });
 self.addEventListener("notificationclick", (event) => { event.notification.close(); event.waitUntil(clients.openWindow(event.notification.data.url)); });

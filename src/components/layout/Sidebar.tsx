@@ -53,7 +53,7 @@ export async function Sidebar() {
   return (
     <aside className="w-64 border-r bg-white h-screen flex flex-col fixed left-0 top-0 no-print">
       <div className="h-16 flex items-center px-6 border-b">
-        <h1 className="text-xl font-bold text-slate-900 tracking-tight">ERPiso</h1>
+        <h1 className="text-xl font-bold text-slate-900 tracking-tight">Distri Pisos</h1>
       </div>
       
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">

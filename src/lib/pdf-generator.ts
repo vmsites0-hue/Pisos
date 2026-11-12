@@ -16,7 +16,7 @@ export function generateSaleTicketPDF(venta: any) {
   // Cabecera
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text("ERPISO S.A.", pageWidth / 2, y, { align: "center" });
+  doc.text("DISTRI PISOS", pageWidth / 2, y, { align: "center" });
   y += 5;
 
   doc.setFontSize(8);
@@ -129,7 +129,7 @@ export function generateQuotationPDF(presupuesto: any) {
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("ERPISO S.A. - PRESUPUESTO", 20, y + 12);
+  doc.text("DISTRI PISOS - PRESUPUESTO", 20, y + 12);
   doc.setFontSize(10);
   doc.text(`#PRES-${presupuesto.id}`, pageWidth - 20, y + 12, { align: "right" });
   y += 28;

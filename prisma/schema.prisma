@@ -475,10 +475,29 @@ model Cliente {
 
   ventas       Venta[]
   presupuestos Presupuesto[]
+  deudas       DeudaCliente[]
   sucursal     Sucursal      @relation(fields: [sucursalId], references: [id])
 
   @@index([sucursalId])
   @@index([activo, nombre, apellido])
+}
+
+// Deuda cargada manualmente (anterior al sistema o fuera de una venta)
+model DeudaCliente {
+  id               Int       @id @default(autoincrement())
+  clienteId        Int
+  concepto         String
+  montoOriginal    Float
+  saldo            Float
+  fechaDeuda       DateTime  @default(now())
+  fechaVencimiento DateTime?
+  notas            String?
+  estado           String    @default("PENDIENTE")
+  usuarioId        Int
+  creadoEn         DateTime  @default(now())
+  cliente          Cliente   @relation(fields: [clienteId], references: [id])
+
+  @@index([clienteId, estado])
 }
 
 // ==========================================

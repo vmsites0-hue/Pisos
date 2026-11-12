@@ -9,7 +9,7 @@ import { PwaRegistration } from "@/components/pwa/PwaRegistration";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ERPiso - Gestión de Materiales",
+  title: "Distri Pisos - Gestión de Materiales",
   description: "Sistema ERP para venta de pisos y materiales de construcción",
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icons/icon-192.svg", apple: "/icons/icon-192.svg" },

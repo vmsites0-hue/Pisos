@@ -14,6 +14,7 @@ export async function getFinancePageData(filters?: { from?: string; to?: string;
     }),
     prisma.cliente.findMany({
       where: { saldoDeudor: { gt: 0 }, sucursal: { esPrincipal: true } },
+      include: { deudas: { where: { estado: "PENDIENTE" }, orderBy: { fechaDeuda: "asc" } } },
       orderBy: { saldoDeudor: "desc" },
     }),
     prisma.gasto.findMany({
@@ -24,6 +25,16 @@ export async function getFinancePageData(filters?: { from?: string; to?: string;
     prisma.movimientoFinanciero.findMany({ where: movementFilter, include: { usuario: { select: { nombre: true } } }, orderBy: { creadoEn: "desc" } }),
     prisma.cierreCaja.findMany({ include: { responsable: { select: { nombre: true } } }, orderBy: { cerradoEn: "desc" }, take: 20 }),
   ]);
+  const allCustomers = await prisma.cliente.findMany({ where: { activo: true, sucursal: { esPrincipal: true } }, select: { id: true, nombre: true, apellido: true, documento: true }, orderBy: [{ nombre: "asc" }, { apellido: "asc" }] });
   const users = await prisma.usuario.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } });
-  return { sales, debtorCustomers, expenses, credits, movements, closures, users };
+
+  // Saldo inicial: lo declarado en el último cierre confirmado anterior al período
+  // + los movimientos de caja posteriores a ese cierre y anteriores al período.
+  const lastClosure = await prisma.cierreCaja.findFirst({ where: { estado: "CERRADO", periodoHasta: { lt: todayStart } }, orderBy: { periodoHasta: "desc" } });
+  const earlier = await prisma.movimientoFinanciero.findMany({
+    where: { afectaCaja: true, creadoEn: { lt: todayStart, ...(lastClosure ? { gt: lastClosure.periodoHasta } : {}) } },
+    select: { tipo: true, importe: true },
+  });
+  const openingBalance = (lastClosure?.importeDeclarado ?? 0) + earlier.reduce((sum, item) => sum + (item.tipo === "INGRESO" ? item.importe : -item.importe), 0);
+  return { sales, debtorCustomers, expenses, credits, movements, closures, users, openingBalance, allCustomers };
 }

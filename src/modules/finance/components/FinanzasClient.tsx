@@ -14,6 +14,7 @@ import {
   Calculator,
   ArrowRight
 } from "lucide-react";
+import { registrarDeudaCliente } from "@/modules/finance/actions/customer-debts.actions";
 import { registrarPagoCliente } from "@/modules/finance/actions/payments.actions";
 import { registrarGasto, eliminarGasto } from "@/modules/finance/actions/expenses.actions";
 import { registerInstallmentPayment } from "@/modules/credit/actions/installment-payments.actions";
@@ -29,15 +30,22 @@ interface FinanzasClientProps {
   users: Array<{ id: number; nombre: string }>;
   filters: { from?: string; to?: string; userId?: number; paymentMethod?: string };
   closures: any[];
+  openingBalance?: number;
+  allCustomers?: Array<{ id: number; nombre: string; apellido: string; documento: string }>;
 }
 
-export function FinanzasClient({ sales, debtorClients, gastos, credits, movements, users, filters, closures }: FinanzasClientProps) {
+export function FinanzasClient({ sales, debtorClients, gastos, credits, movements, users, filters, closures, openingBalance = 0, allCustomers = [] }: FinanzasClientProps) {
   // Modal de cobro de clientes
   const [isCobroModalOpen, setIsCobroModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [cobroError, setCobroError] = useState<string | null>(null);
   const [cobroLoading, setCobroLoading] = useState(false);
   const [installmentMessage, setInstallmentMessage] = useState<string | null>(null);
+
+  // Modal de registro de deuda manual
+  const [isDeudaModalOpen, setIsDeudaModalOpen] = useState(false);
+  const [deudaError, setDeudaError] = useState<string | null>(null);
+  const [deudaLoading, setDeudaLoading] = useState(false);
 
   // Modal de registro de gastos
   const [isGastoModalOpen, setIsGastoModalOpen] = useState(false);
@@ -82,7 +90,7 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
       return;
     }
 
-    const res = await registrarPagoCliente(selectedClient.id, monto);
+    const res = await registrarPagoCliente(selectedClient.id, monto, String(formData.get("metodoPago") ?? "EFECTIVO"));
     setCobroLoading(false);
 
     if (res.error) {
@@ -91,6 +99,16 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
       setIsCobroModalOpen(false);
       setSelectedClient(null);
     }
+  }
+
+  async function handleRegistrarDeuda(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setDeudaLoading(true);
+    setDeudaError(null);
+    const res = await registrarDeudaCliente(new FormData(e.currentTarget));
+    setDeudaLoading(false);
+    if (res.error) setDeudaError(res.error);
+    else setIsDeudaModalOpen(false);
   }
 
   // Manejar creación de gasto
@@ -155,7 +173,7 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
           <button className="rounded bg-slate-900 p-2 text-xs font-semibold text-white">Consultar período</button>
         </form>
         <div className="mt-4 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
-          {[["Ventas brutas", summary.grossSales], ["Descuentos", summary.discounts], ["Devoluciones", summary.returns], ["Ventas netas", summary.netSales], ["Cobros", summary.collections], ["Cuentas por cobrar", summary.accountsReceivable], ["Gastos", summary.expenses], ["Saldo de caja", summary.cashBalance]].map(([label, value]) => <div key={String(label)} className="rounded border p-3"><span className="block text-slate-500">{label}</span><strong>{formatMoney(Number(value))}</strong></div>)}
+          {[["Ventas brutas", summary.grossSales], ["Descuentos", summary.discounts], ["Devoluciones", summary.returns], ["Ventas netas", summary.netSales], ["Cobros", summary.collections], ["Cuentas por cobrar", summary.accountsReceivable], ["Gastos", summary.expenses], ["Saldo inicial de caja", openingBalance], ["Saldo de caja", openingBalance + summary.cashBalance]].map(([label, value]) => <div key={String(label)} className="rounded border p-3"><span className="block text-slate-500">{label}</span><strong>{formatMoney(Number(value))}</strong></div>)}
         </div>
         <p className="mt-2 text-[10px] text-slate-500">El local principal se aplica internamente; no existe filtro multisucursal.</p>
       </section>
@@ -213,8 +231,8 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
             <span className="text-[10px] font-bold uppercase tracking-wider">Caja Efectivo</span>
             <Wallet size={16} className="text-slate-400" />
           </div>
-          <div className="text-lg font-bold text-slate-900">{formatMoney(totalEfectivo)}</div>
-          <div className="text-[9px] text-slate-400">Tarjeta: {formatMoney(totalTarjeta)}</div>
+          <div className="text-lg font-bold text-slate-900">{formatMoney(openingBalance + summary.cashBalance)}</div>
+          <div className="text-[9px] text-slate-400">Inicial: {formatMoney(openingBalance)} · Tarjeta: {formatMoney(totalTarjeta)}</div>
         </div>
 
         {/* Cuentas por Cobrar */}
@@ -239,6 +257,9 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
                 <PiggyBank className="text-slate-500" size={18} />
                 <span>Cartera de Deudores (Crédito Cuenta Corriente)</span>
               </h3>
+              <button onClick={() => { setDeudaError(null); setIsDeudaModalOpen(true); }} className="bg-slate-950 hover:bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1 cursor-pointer">
+                <Plus size={12} /> Registrar deuda
+              </button>
             </div>
             <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
               <table className="w-full text-xs text-left">
@@ -262,6 +283,13 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
                         <td className="px-3 py-3 font-semibold text-slate-900">
                           {cli.nombre} {cli.apellido}
                           <div className="text-[10px] text-slate-500 font-normal">CI: {cli.documento}</div>
+                          {(cli.deudas ?? []).map((d: any) => (
+                            <div key={d.id} className="text-[10px] text-slate-500 font-normal">
+                              • {d.concepto}: {formatMoney(d.saldo)}
+                              {d.fechaVencimiento ? ` · vence ${new Date(d.fechaVencimiento).toLocaleDateString("es-PY")}` : ""}
+                              {d.fechaVencimiento && new Date(d.fechaVencimiento) < new Date() ? " (VENCIDA)" : ""}
+                            </div>
+                          ))}
                         </td>
                         <td className="px-3 py-3 text-right font-bold text-red-600">
                           {formatMoney(cli.saldoDeudor)}
@@ -460,6 +488,55 @@ export function FinanzasClient({ sales, debtorClients, gastos, credits, movement
         </div>
       )}
 
+      {isDeudaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl border shadow-xl w-full max-w-lg p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-base text-slate-900">Registrar deuda de cliente</h3>
+              <button onClick={() => setIsDeudaModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer"><X size={20} /></button>
+            </div>
+            {deudaError && <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-medium">{deudaError}</div>}
+            <form onSubmit={handleRegistrarDeuda} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Cliente que debe *</label>
+                <select required name="clienteId" defaultValue="" className="w-full border rounded p-2 text-xs bg-white">
+                  <option value="" disabled>Seleccionar cliente...</option>
+                  {allCustomers.map((c) => <option key={c.id} value={c.id}>{c.nombre} {c.apellido} — CI: {c.documento}</option>)}
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">Si no está en la lista, crealo primero en Clientes.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Monto adeudado (Gs.) *</label>
+                  <input required name="monto" type="number" min="1" step="1" className="w-full border rounded p-2 text-xs bg-white font-bold" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Concepto *</label>
+                  <input required name="concepto" type="text" placeholder="Ej: 20 cajas de porcelanato" className="w-full border rounded p-2 text-xs bg-white" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Fecha de la deuda</label>
+                  <input name="fechaDeuda" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="w-full border rounded p-2 text-xs bg-white" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Fecha de vencimiento</label>
+                  <input name="fechaVencimiento" type="date" className="w-full border rounded p-2 text-xs bg-white" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Notas</label>
+                <textarea name="notas" rows={2} placeholder="Acuerdo de pago, referencias, etc." className="w-full border rounded p-2 text-xs bg-white" />
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button type="button" onClick={() => setIsDeudaModalOpen(false)} className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded text-xs font-medium cursor-pointer">Cancelar</button>
+                <button type="submit" disabled={deudaLoading} className="px-3 py-1.5 bg-slate-950 text-white rounded text-xs font-bold cursor-pointer disabled:opacity-50">{deudaLoading ? "Guardando..." : "Guardar deuda"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

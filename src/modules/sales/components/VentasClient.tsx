@@ -794,7 +794,7 @@ export function VentasClient({ products, categories, sucursales, inventarios, cl
             {/* Cuerpo del Recibo */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs font-mono">
               <div className="text-center space-y-1">
-                <h5 className="font-bold text-sm">ERPISO S.A.</h5>
+                <h5 className="font-bold text-sm">DISTRI PISOS</h5>
                 <p className="font-bold uppercase tracking-wide">Comprobante interno no fiscal</p>
                 <p className="text-slate-500">Sucursal: {createdVenta.sucursal.nombre}</p>
                 <p className="text-slate-500">Fecha: {new Date(createdVenta.fecha).toLocaleString("es-PY")}</p>
