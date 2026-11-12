@@ -1,5 +1,6 @@
 FROM node:22-alpine AS base
-RUN corepack enable
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 NEXT_TELEMETRY_DISABLED=1
+RUN corepack enable && corepack prepare pnpm@11.8.0 --activate
 WORKDIR /app
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./

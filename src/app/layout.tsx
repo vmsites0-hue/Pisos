@@ -1,12 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import "@fontsource-variable/inter";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { getAuthenticatedUser } from "@/modules/auth/services/session.service";
 import { PwaRegistration } from "@/components/pwa/PwaRegistration";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Distri Pisos - Gestión de Materiales",
@@ -26,7 +24,7 @@ export default async function RootLayout({
 
   return (
     <html lang="es">
-      <body className={inter.className}>
+      <body style={{ fontFamily: "'Inter Variable', sans-serif" }}>
         <PwaRegistration />
         {user ? (
           <div className="flex min-h-screen">
